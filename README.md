@@ -192,6 +192,18 @@ The TLC5955 LED driver requires the control register to be sent **twice** before
 - [ ] IMU (LSM6DS3TR-C) driver
 - [ ] Bluetooth LE
 
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+**Tip:** This is complex bare-metal embedded code — direct register access, ARM exceptions, linker scripts. We strongly recommend using an AI coding assistant (GitHub Copilot, Cursor, etc.) to help navigate STM32 registers, ARM Cortex-M internals, and the pybricks reference source. We built this entire project with AI assistance and it was essential.
+
+```bash
+git clone https://github.com/YOUR_USERNAME/LegoSpikeRust.git
+cd LegoSpikeRust
+# See CONTRIBUTING.md for toolchain setup and workflow
+```
+
 ## License
 
 This project is for educational and personal use. Hardware documentation was derived from studying the [Pybricks](https://github.com/pybricks/pybricks-micropython) open-source project (MIT License).
