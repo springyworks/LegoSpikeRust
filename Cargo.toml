@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+
+members = [
+  "hub-motors",
+  "bootloader",
+  "monitor",
+  "led-test",
+  # spike-rt crates (need spike-rt submodule cloned):
+  # "spike-rt/sample/rust_led/rust_app",
+  # "spike-rt/sample/rust_qemu_exercises/rust_app",
+  # "spike-rt/sample/rust_qemu_min/rust_app",
+]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+lto = true
+codegen-units = 1

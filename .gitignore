@@ -1,0 +1,28 @@
+# Build artifacts
+target/
+*.bin
+/tmp/
+
+# IDE
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firmware binaries (built artifacts)
+firmware.dfu
+
+# Python
+__pycache__/
+*.pyc
+
+# Build directory (pybricks)
+build/
+
+# Backup files
+*~
+*.bak
+*.swp
+pybricks-micropython

@@ -1,0 +1,7 @@
+[toolchain]
+# Keep this on stable unless you explicitly want nightly-only features.
+channel = "stable"
+components = ["rust-src"]
+# SPIKE Prime hub uses Cortex-M4F (thumbv7em-none-eabihf)
+# (Installed on-demand by rustup.)
+targets = ["thumbv7em-none-eabihf"]

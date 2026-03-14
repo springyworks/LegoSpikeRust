@@ -1,0 +1,28 @@
+# 1. Flash monitor (replaces bootloader at 0x08008000)
+./dev.sh --monitor
+
+# 2. Connect serial terminal
+picocom -b 115200 /dev/ttyACM1
+# (or: minicom -D /dev/ttyACM1)
+
+# 3. You'll see the banner and > prompt. Try:
+> help
+> motors          # ← Motor B diagnosis starts here
+> dbgmon          # enable DebugMonitor
+> bp 08010248     # set breakpoint at app's SysTick handler
+> run             # arm monitor + jump to app
+
+# 4. Upload app binary (no DFU needed!):
+cd led-test && cargo build --release
+arm-none-eabi-objcopy -O binary target/thumbv7em-none-eabihf/release/led-test /tmp/led-test.bin
+python3 upload.py /tmp/led-test.bin /dev/ttyACM1
+# Then type 'run' in monitor or answer 'y' to upload.py prompt
+
+# 5. When breakpoint fires:
+*** BREAKPOINT ***
+PC=0x08010248 [BKPT]
+ r0=0x... r1=0x... r2=0x... r3=0x...
+dbg> regs         # show registers again
+dbg> peek 40010034 # check TIM1_CCR1 while halted
+dbg> step          # execute one instruction
+dbg> cont          # resume app
