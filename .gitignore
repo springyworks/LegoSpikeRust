@@ -1,6 +1,10 @@
 # Build artifacts
 target/
+build/
 *.bin
+*.dfu
+*.elf
+*.hex
 /tmp/
 
 # IDE
@@ -11,18 +15,14 @@ target/
 .DS_Store
 Thumbs.db
 
-# Firmware binaries (built artifacts)
-firmware.dfu
-
 # Python
 __pycache__/
 *.pyc
 
-# Build directory (pybricks)
-build/
+# Reference source (not our code, clone separately)
+pybricks-micropython/
 
-# Backup files
+# Backup / temp files
 *~
 *.bak
 *.swp
-pybricks-micropython
