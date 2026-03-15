@@ -4,6 +4,8 @@
 
 No OS. No HAL crate. No RTOS. Just Rust, direct register access, and a resident debug monitor — running on a Cortex-M4F at 96 MHz.
 
+![LEGO Hub running Rust firmware](resources/lego-hub-rust-demo.gif)
+
 ## What This Is
 
 A from-scratch Rust firmware stack for the LEGO Education SPIKE Prime Hub (STM32F413VGT6), built entirely without an operating system. The only "OS" here is a 25 KB Rust debug monitor that lives in flash and supervises application code.
@@ -50,11 +52,12 @@ A resident embedded debug monitor providing:
 - **Center button pause** — press the hub's center button to pause a running app (via ADC resistor ladder reading + SysTick interrupt)
 - **Serial app upload** — flash new application code without DFU mode (`upload` command + `upload.py`)
 - **Motor diagnostics** — `motors` command dumps GPIO/TIM1 config for all 6 ports
-- **DFU entry** — `dfu` command to enter STM32 system bootloader
+- **DFU entry** — `dfu` command to enter the STM32 system bootloader. [How to do DFU](https://github.com/orgs/pybricks/discussions/688), it can happen that one has to temporarely remove the battery and the USB to reset the hub completley first before going into DFU;
 
 ### Application Trampolines
 
 Apps link against the monitor via RAM-based function pointers:
+
 - `0x2004FFE0` — DebugMonitor handler (breakpoints, single-step)
 - `0x2004FFE4` — SysTick handler (center button polling via ADC)
 
@@ -62,12 +65,12 @@ Apps are simple `#[no_std]` binaries with inline assembly trampolines that forwa
 
 ### Workspace Crates
 
-| Crate | Purpose | Binary Size |
-|-------|---------|-------------|
-| `monitor/` | Resident debug monitor + USB serial shell | 25 KB |
-| `led-test/` | LED matrix test app (TLC5955 driver) | 3.3 KB |
-| `hub-motors/` | Motor control with RTIC v2 + defmt | — |
-| `bootloader/` | Simple bootloader (superseded by monitor) | — |
+| Crate         | Purpose                                   | Binary Size |
+| ------------- | ----------------------------------------- | ----------- |
+| `monitor/`    | Resident debug monitor + USB serial shell | 25 KB       |
+| `led-test/`   | LED matrix test app (TLC5955 driver)      | 3.3 KB      |
+| `hub-motors/` | Motor control with RTIC v2 + defmt        | —           |
+| `bootloader/` | Simple bootloader (superseded by monitor) | —           |
 
 ## Hardware
 
@@ -90,6 +93,8 @@ This project heavily references and reuses knowledge from the **[Pybricks](https
 - **USB OTG configuration** — FIFO depths, endpoint counts, VBUS detection via PA9.
 
 The Pybricks source tree is included as a reference in `pybricks-micropython/`. No Pybricks C code is compiled or linked — all firmware is written in Rust, but the hardware knowledge came from studying their excellent codebase.
+
+See also: [Pybricks discussion on custom firmware for SPIKE Prime](https://github.com/orgs/pybricks/discussions/688)
 
 ## Build & Deploy
 
@@ -119,6 +124,7 @@ dfu-util -d 0694:0011 -a 0 -s 0x08008000:leave -D /tmp/monitor.bin
 ```
 
 Or use the dev script:
+
 ```bash
 ./dev.sh --monitor
 ```
@@ -162,6 +168,7 @@ At breakpoint (dbg> prompt):
 ### No OS — Just Interrupts and Bare Metal
 
 There is no RTOS, no scheduler, no threads. The monitor is a single `#[no_main]` binary that:
+
 1. Configures the PLL (96 MHz HCLK, 48 MHz USB)
 2. Initializes USB OTG FS as CDC serial
 3. Runs a polling loop reading serial commands
