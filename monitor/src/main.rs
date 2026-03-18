@@ -435,6 +435,80 @@ unsafe fn setup_mpu() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// STM32 Flash Write Protection (option bytes)
+// ════════════════════════════════════════════════════════════════
+//
+// STM32F413 FLASH_OPTCR register (0x40023C14):
+//   Bits [27:16] = nWRP — NOT write-protect for sectors 0..11
+//   A '0' bit means the sector IS write-protected.
+//   A '1' bit means the sector is NOT protected (default).
+//
+// Sector layout:
+//   0: 0x08000000 16KB (LEGO bootloader)
+//   1: 0x08004000 16KB (LEGO bootloader)
+//   2: 0x08008000 16KB (monitor lo)
+//   3: 0x0800C000 16KB (monitor hi)
+//   4: 0x08010000 64KB (app)
+//
+// We protect sectors 0–3 (bootloader + monitor).
+// Writing option bytes triggers a system reset when applied.
+
+const FLASH_OPTKEYR: *mut u32 = (FLASH_R + 0x08) as *mut u32;
+const FLASH_OPTCR: *mut u32 = (FLASH_R + 0x14) as *mut u32;
+
+/// Returns true if sectors 0-3 are write-protected.
+unsafe fn flash_wrp_is_protected() -> bool {
+    let optcr = ptr::read_volatile(FLASH_OPTCR);
+    // nWRP bits [19:16] for sectors 0-3.  All zero = protected.
+    (optcr & (0xF << 16)) == 0
+}
+
+/// Enable write protection on sectors 0-3 (bootloader + monitor).
+/// WARNING: triggers system reset after option byte write completes.
+unsafe fn flash_wrp_protect() {
+    // Unlock option bytes
+    ptr::write_volatile(FLASH_OPTKEYR, 0x0819_2A3B);
+    ptr::write_volatile(FLASH_OPTKEYR, 0x4C5D_6E7F);
+
+    // Wait for no ongoing flash operation
+    while ptr::read_volatile((FLASH_R + 0x0C) as *const u32) & (1 << 16) != 0 {}
+
+    // Read current OPTCR, clear nWRP bits for sectors 0-3
+    let mut optcr = ptr::read_volatile(FLASH_OPTCR);
+    optcr &= !(0xF << 16); // clear bits 16-19 → protect sectors 0-3
+
+    // Write back with OPTSTRT=1 (bit 1) to program
+    ptr::write_volatile(FLASH_OPTCR, optcr | (1 << 1));
+
+    // Wait for completion
+    while ptr::read_volatile((FLASH_R + 0x0C) as *const u32) & (1 << 16) != 0 {}
+
+    // Lock option bytes (set OPTLOCK = bit 0 of FLASH_OPTCR... actually
+    // just reset — option byte changes require reset to take effect)
+    cortex_m::peripheral::SCB::sys_reset();
+}
+
+/// Remove write protection on sectors 0-3.
+/// WARNING: triggers system reset.
+unsafe fn flash_wrp_unprotect() {
+    // Unlock option bytes
+    ptr::write_volatile(FLASH_OPTKEYR, 0x0819_2A3B);
+    ptr::write_volatile(FLASH_OPTKEYR, 0x4C5D_6E7F);
+
+    while ptr::read_volatile((FLASH_R + 0x0C) as *const u32) & (1 << 16) != 0 {}
+
+    // Read current OPTCR, set nWRP bits for sectors 0-3 (unprotect)
+    let mut optcr = ptr::read_volatile(FLASH_OPTCR);
+    optcr |= 0xF << 16; // set bits 16-19 → unprotect sectors 0-3
+
+    ptr::write_volatile(FLASH_OPTCR, optcr | (1 << 1));
+
+    while ptr::read_volatile((FLASH_R + 0x0C) as *const u32) & (1 << 16) != 0 {}
+
+    cortex_m::peripheral::SCB::sys_reset();
+}
+
+// ════════════════════════════════════════════════════════════════
 // Jump to application
 // ════════════════════════════════════════════════════════════════
 
@@ -1250,7 +1324,7 @@ fn serial_write_hex32(serial: &mut SerialPort<'_, UsbBus<UsbFs>>, val: u32,
 fn cmd_help(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
             usb_dev: &mut UsbDevice<'_, UsbBus<UsbFs>>) {
     serial_write_str(serial, concat!(
-        "LEGO Hub Monitor v0.4 (always-on)\r\n",
+        "LEGO Hub Monitor v0.5 (always-on)\r\n",
         "Commands:\r\n",
         "  help              Show this help\r\n",
         "  peek <addr>       Read 32-bit word\r\n",
@@ -1268,6 +1342,8 @@ fn cmd_help(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
         "  dbgmon            Enable DebugMonitor exception\r\n",
         "  upload            Flash app binary (serial)\r\n",
         "  run               Launch app (monitor stays alive)\r\n",
+        "  protect           Enable flash WRP (sectors 0-3)\r\n",
+        "  unprotect         Disable flash WRP (for DFU)\r\n",
         "  off / poweroff    Power off hub (release PA13)\r\n",
         "  dfu               Enter STM32 system DFU\r\n",
         "  reboot            Reset MCU\r\n",
@@ -1714,6 +1790,26 @@ fn dispatch_command(
             }
             unsafe { power_off(); }
         }
+        b"protect" => {
+            if unsafe { flash_wrp_is_protected() } {
+                serial_write_str(serial, "Flash already protected (sectors 0-3)\r\n", usb_dev);
+            } else {
+                serial_write_str(serial, "Enabling flash write-protect sectors 0-3...\r\n", usb_dev);
+                serial_write_str(serial, "System will reset.\r\n", usb_dev);
+                for _ in 0..50_000 { usb_dev.poll(&mut [serial]); }
+                unsafe { flash_wrp_protect(); }
+            }
+        }
+        b"unprotect" => {
+            if !unsafe { flash_wrp_is_protected() } {
+                serial_write_str(serial, "Flash not protected\r\n", usb_dev);
+            } else {
+                serial_write_str(serial, "Removing flash write-protect...\r\n", usb_dev);
+                serial_write_str(serial, "System will reset. Run 'dfu' after to update.\r\n", usb_dev);
+                for _ in 0..50_000 { usb_dev.poll(&mut [serial]); }
+                unsafe { flash_wrp_unprotect(); }
+            }
+        }
         _ => {
             serial_write_str(serial, "Unknown: ", usb_dev);
             serial_write_all(serial, cmd, usb_dev);
@@ -1857,9 +1953,14 @@ fn main() -> ! {
         let mut shell = ShellState::new();
 
         serial_write_str(serial, "\r\n\u{2554}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2557}\r\n", usb_dev);
-        serial_write_str(serial, "\u{2551}  LEGO Hub Debug Monitor v0.4    \u{2551}\r\n", usb_dev);
+        serial_write_str(serial, "\u{2551}  LEGO Hub Debug Monitor v0.5    \u{2551}\r\n", usb_dev);
         serial_write_str(serial, "\u{2551}  Always-on CLI (1kHz SysTick)   \u{2551}\r\n", usb_dev);
         serial_write_str(serial, "\u{2551}  MPU-protected | STM32F413      \u{2551}\r\n", usb_dev);
+        if unsafe { flash_wrp_is_protected() } {
+            serial_write_str(serial, "\u{2551}  Flash WRP: ON (sectors 0-3)    \u{2551}\r\n", usb_dev);
+        } else {
+            serial_write_str(serial, "\u{2551}  Flash WRP: OFF                 \u{2551}\r\n", usb_dev);
+        }
         serial_write_str(serial, "\u{2551}  Type 'help' for commands       \u{2551}\r\n", usb_dev);
         serial_write_str(serial, "\u{255A}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{255D}\r\n", usb_dev);
         serial_write_str(serial, "> ", usb_dev);
