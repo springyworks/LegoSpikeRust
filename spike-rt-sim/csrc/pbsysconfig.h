@@ -1,0 +1,28 @@
+// spike-rt-sim system config — minimal for Rust programs
+// No MicroPython, no complex HMI
+
+#define PBSYS_CONFIG_FEATURE_BUILTIN_USER_PROGRAM_REPL             (0)
+#define PBSYS_CONFIG_FEATURE_BUILTIN_USER_PROGRAM_PORT_VIEW        (0)
+#define PBSYS_CONFIG_FEATURE_BUILTIN_USER_PROGRAM_IMU_CALIBRATION  (0)
+#define PBSYS_CONFIG_FEATURE_PROGRAM_FORMAT_MULTI_MPY_V6           (0)
+#define PBSYS_CONFIG_FEATURE_PROGRAM_FORMAT_MULTI_MPY_V6_3_NATIVE  (0)
+
+#define PBSYS_CONFIG_BATTERY                        (1)
+#define PBSYS_CONFIG_BATTERY_CHARGER                (0)
+#define PBSYS_CONFIG_HOST                           (0)
+#define PBSYS_CONFIG_HMI                            (1)
+#define PBSYS_CONFIG_HMI_STOP_BUTTON                (1 << 5)
+#define PBSYS_CONFIG_HMI_NONE                       (1)
+#define PBSYS_CONFIG_HMI_NUM_SLOTS                  (1)
+#define PBSYS_CONFIG_HUB_LIGHT_MATRIX               (0)
+#define PBSYS_CONFIG_MAIN                           (1)
+#define PBSYS_CONFIG_STORAGE                        (0)
+#define PBSYS_CONFIG_STORAGE_NUM_SLOTS              (1)
+#define PBSYS_CONFIG_STORAGE_USER_DATA_SIZE         (512)
+#define PBSYS_CONFIG_STATUS_LIGHT                   (0)
+#define PBSYS_CONFIG_STATUS_LIGHT_BATTERY           (0)
+#define PBSYS_CONFIG_STATUS_LIGHT_BLUETOOTH         (0)
+#define PBSYS_CONFIG_STATUS_LIGHT_STATE_ANIMATIONS  (0)
+#define PBSYS_CONFIG_TELEMETRY                      (0)
+#define PBSYS_CONFIG_USER_PROGRAM                   (0)
+#define PBSYS_CONFIG_PROGRAM_STOP                   (1)

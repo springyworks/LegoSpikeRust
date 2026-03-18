@@ -1,0 +1,8 @@
+[package]
+name = "spike-rt-sim"
+version = "0.1.0"
+edition = "2021"
+description = "Native Linux simulator for LEGO SPIKE Prime, built on Pybricks pbio"
+
+[build-dependencies]
+cc = "1.0"
