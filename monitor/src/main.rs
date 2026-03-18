@@ -357,6 +357,24 @@ unsafe fn pre_init() {
 // Enter STM32 system bootloader (USB DFU at 0x1FFF0000)
 // ════════════════════════════════════════════════════════════════
 
+/// Power off the hub by releasing PA13 (power hold).
+/// Just like LEGO firmware and Pybricks — long-press center button = off.
+/// The hub's soft-power circuit cuts power when PA13 goes low.
+unsafe fn power_off() -> ! {
+    cortex_m::interrupt::disable();
+    // Stop motors
+    motor_set(Motor::A, 0);
+    motor_set(Motor::B, 0);
+    // Disable SysTick
+    ptr::write_volatile(SYST_CSR, 0);
+    // Turn off status LED (PA15 LAT low, disable GSCLK)
+    reg_write(TIM12, 0x00, 0); // TIM12 CEN=0
+    // Release PA13 → power circuit shuts down
+    ptr::write_volatile((GPIOA + 0x18) as *mut u32, 1 << (13 + 16)); // BSRR: reset PA13
+    // In case power doesn't drop instantly, hang
+    loop { cortex_m::asm::wfi(); }
+}
+
 unsafe fn enter_system_dfu() -> ! {
     cortex_m::interrupt::disable();
     ptr::write_volatile(0xE000_E010 as *mut u32, 0); // disable SysTick
@@ -375,16 +393,70 @@ unsafe fn enter_system_dfu() -> ! {
 }
 
 // ════════════════════════════════════════════════════════════════
+// ARM MPU: protect monitor flash + RAM from app writes
+// ════════════════════════════════════════════════════════════════
+
+// MPU registers (ARMv7-M)
+const MPU_TYPE: *const u32 = 0xE000_ED90 as *const u32;
+const MPU_CTRL: *mut u32 = 0xE000_ED94 as *mut u32;
+const MPU_RNR: *mut u32 = 0xE000_ED98 as *mut u32;
+const MPU_RBAR: *mut u32 = 0xE000_ED9C as *mut u32;
+const MPU_RASR: *mut u32 = 0xE000_EDA0 as *mut u32;
+
+unsafe fn setup_mpu() {
+    let mpu_type = ptr::read_volatile(MPU_TYPE);
+    let regions = (mpu_type >> 8) & 0xFF;
+    if regions == 0 { return; } // no MPU
+
+    // Disable MPU while configuring
+    ptr::write_volatile(MPU_CTRL, 0);
+
+    // Region 0: Monitor flash — read-only, execute  (0x08008000, 32KB)
+    // SIZE = 14 → 2^(14+1) = 32768 bytes
+    // AP = 0b110 (RO for priv+unpriv)  TEX=0, C=1, B=0, S=0
+    ptr::write_volatile(MPU_RNR, 0);
+    ptr::write_volatile(MPU_RBAR, 0x0800_8000);
+    ptr::write_volatile(MPU_RASR, (0b110 << 24) | (1 << 17) | (14 << 1) | 1);
+
+    // Region 1: Monitor RAM — privileged only  (0x2004E000, 8KB)
+    // SIZE = 12 → 2^(12+1) = 8192 bytes
+    // AP = 0b001 (priv RW, unpriv no access)  TEX=0, C=1, B=1, S=1
+    ptr::write_volatile(MPU_RNR, 1);
+    ptr::write_volatile(MPU_RBAR, 0x2004_E000);
+    ptr::write_volatile(MPU_RASR, (0b001 << 24) | (1 << 18) | (1 << 17) | (1 << 16) | (12 << 1) | 1);
+
+    // Enable MPU: PRIVDEFENA=1 (default map for priv), ENABLE=1
+    // This means: privileged code uses default memory map PLUS the regions.
+    // Unprivileged code only sees MPU regions. But since we run app in
+    // privileged mode (for now), the key protection is flash read-only.
+    ptr::write_volatile(MPU_CTRL, (1 << 2) | 1);
+    cortex_m::asm::dsb();
+    cortex_m::asm::isb();
+}
+
+// ════════════════════════════════════════════════════════════════
 // Jump to application
 // ════════════════════════════════════════════════════════════════
 
 unsafe fn jump_to_app(sp: u32, pc: u32) -> ! {
     cortex_m::interrupt::disable();
-    // Don't disable SysTick — monitor uses it to poll center button
+    // Don't disable SysTick — monitor uses it to poll USB + center button
     ptr::write_volatile(0xE000_ED04 as *mut u32, 1 << 25); // clear PendSV
-    ptr::write_volatile(0xE000_ED08 as *mut u32, APP_ADDR); // VTOR
+
+    // DO NOT change VTOR — keep monitor's vector table so SysTick,
+    // DebugMonitor, and HardFault all route through monitor code.
+    // SysTick polls USB at 1000 Hz → always-on CLI.
+
+    // Set up MPU to protect monitor flash+RAM
+    setup_mpu();
+
+    // Mark app as running — SysTick shell takes over
+    APP_RUNNING = true;
+    STOP_REQUESTED = false;
+    ISR_SHELL.reset();
+
     core::arch::asm!("MSR MSP, {}", in(reg) sp);
-    cortex_m::interrupt::enable(); // re-enable so SysTick fires in app
+    cortex_m::interrupt::enable();
     let entry: extern "C" fn() -> ! = core::mem::transmute(pc);
     entry();
 }
@@ -481,7 +553,10 @@ unsafe fn dwt_clear_watchpoint(comp_id: usize) {
 // SysTick handler — polls center button, pends DebugMonitor
 // ════════════════════════════════════════════════════════════════
 
-static mut BUTTON_DEBOUNCE: u8 = 0;
+static mut BUTTON_DEBOUNCE: u16 = 0;
+static mut BUTTON_WAS_PRESSED: bool = false;
+static mut LS_TICK: u32 = 0;
+static mut JERK_CYCLE: u32 = 0;
 
 // SysTick handler: naked wrapper → Rust handler
 core::arch::global_asm!(
@@ -496,44 +571,50 @@ core::arch::global_asm!(
     handler = sym systick_handler,
 );
 
+static mut SYSTICK_DIV: u8 = 0;
+
 extern "C" fn systick_handler() {
     unsafe {
-        // Center button uses a resistor ladder on PC4 (ADC1 channel 14).
-        // Pressed voltage (~2.5V) is above GPIO threshold, so we must use ADC.
+        // ── Always poll USB (1000 Hz) — keeps CDC alive ──
+        if APP_RUNNING {
+            usb_poll_shell();
+        }
+
+        // ── Check stop request (from shell) ──
+        if APP_RUNNING && STOP_REQUESTED {
+            motor_set(Motor::A, 0);
+            motor_set(Motor::B, 0);
+            APP_RUNNING = false;
+            STOP_REQUESTED = false;
+            cortex_m::peripheral::SCB::sys_reset();
+        }
+
+        // ── Button check at 100 Hz (every 10th tick) ──
+        SYSTICK_DIV = SYSTICK_DIV.wrapping_add(1);
+        if SYSTICK_DIV % 10 != 0 { return; }
+
         const ADC_CCR: *mut u32 = 0x4001_2304 as *mut u32;
 
-        // Enable clocks: GPIOC (AHB1ENR bit 2), ADC1 (APB2ENR bit 8)
         reg_modify(RCC, 0x30, 0, 1 << 2);
         reg_modify(RCC, 0x44, 0, 1 << 8);
-
-        // PC4 as analog (MODER bits 9:8 = 11)
         reg_modify(GPIOC, 0x00, 0x3 << 8, 0x3 << 8);
 
-        // ADC prescaler: PCLK2/4 (24 MHz, within 36 MHz limit)
         let ccr = ptr::read_volatile(ADC_CCR);
         ptr::write_volatile(ADC_CCR, (ccr & !(3 << 16)) | (1 << 16));
 
-        // Turn off ADC for clean config
-        ptr::write_volatile((ADC1 + 0x08) as *mut u32, 0); // CR2 ADON=0
-        // CR1: 12-bit, no scan
+        ptr::write_volatile((ADC1 + 0x08) as *mut u32, 0);
         ptr::write_volatile((ADC1 + 0x04) as *mut u32, 0);
-        // Sample time ch14: 56 cycles (SMPR1 bits [14:12] = 011)
         let smpr = ptr::read_volatile((ADC1 + 0x0C) as *mut u32);
         ptr::write_volatile((ADC1 + 0x0C) as *mut u32, (smpr & !(7 << 12)) | (3 << 12));
-        // 1 conversion of channel 14
-        ptr::write_volatile((ADC1 + 0x2C) as *mut u32, 0);  // SQR1: L=0
-        ptr::write_volatile((ADC1 + 0x34) as *mut u32, 14); // SQR3: ch14
+        ptr::write_volatile((ADC1 + 0x2C) as *mut u32, 0);
+        ptr::write_volatile((ADC1 + 0x34) as *mut u32, 14);
 
-        // Enable ADC
         ptr::write_volatile((ADC1 + 0x08) as *mut u32, 1);
-        // Stabilization delay (~3µs at 96 MHz ≈ 288 cycles)
         for _ in 0..300u32 { cortex_m::asm::nop(); }
 
-        // Start conversion
-        ptr::write_volatile((ADC1 + 0x00) as *mut u32, 0);          // clear SR
-        ptr::write_volatile((ADC1 + 0x08) as *mut u32, 1 | (1 << 30)); // SWSTART
+        ptr::write_volatile((ADC1 + 0x00) as *mut u32, 0);
+        ptr::write_volatile((ADC1 + 0x08) as *mut u32, 1 | (1 << 30));
 
-        // Wait for EOC (SR bit 1)
         for _ in 0..1000u32 {
             if ptr::read_volatile((ADC1 + 0x00) as *mut u32) & (1 << 1) != 0 {
                 break;
@@ -541,33 +622,45 @@ extern "C" fn systick_handler() {
         }
 
         let raw = (ptr::read_volatile((ADC1 + 0x4C) as *mut u32) & 0xFFF) as u16;
-
-        // Turn off ADC
         ptr::write_volatile((ADC1 + 0x08) as *mut u32, 0);
 
-        // Resistor ladder DEV_0 thresholds (pybricks):
-        //   No press:      > 3642 (~3.3V, pulled high)
-        //   Center (CH_1): 2879..3142 (~2.5V, 10k+33k divider)
         let center = raw > 2600 && raw < 3400;
 
         if center {
             BUTTON_DEBOUNCE = BUTTON_DEBOUNCE.saturating_add(1);
-            if BUTTON_DEBOUNCE >= 50 {
-                let demcr = ptr::read_volatile(SCB_DEMCR);
-                ptr::write_volatile(SCB_DEMCR, demcr | (1 << 17)); // MON_PEND
-                BUTTON_DEBOUNCE = 0;
+            if BUTTON_DEBOUNCE >= 10 && !BUTTON_WAS_PRESSED {
+                BUTTON_WAS_PRESSED = true;
+                if APP_RUNNING {
+                    // Short press while app running → stop app
+                    STOP_REQUESTED = true;
+                } else {
+                    DEMO_ACTIVE = !DEMO_ACTIVE;
+                    if !DEMO_ACTIVE {
+                        motor_set(Motor::A, 0);
+                        motor_set(Motor::B, 0);
+                    } else {
+                        LS_TICK = 0;
+                        JERK_CYCLE = 0;
+                    }
+                }
+            }
+            // Long press (3s @ 100Hz = 300 ticks): POWER OFF
+            // Just like LEGO firmware and Pybricks — always works.
+            if BUTTON_DEBOUNCE >= 300 {
+                power_off();
             }
         } else {
             BUTTON_DEBOUNCE = 0;
+            BUTTON_WAS_PRESSED = false;
         }
     }
 }
 
-/// Set up SysTick at ~100 Hz and write handler address to trampoline
+/// Set up SysTick at 1000 Hz and write handler address to trampoline
 unsafe fn arm_systick() {
-    // 96 MHz / 100 Hz = 960000 ticks
+    // 96 MHz / 1000 Hz = 96000 ticks
     ptr::write_volatile(SYST_CSR, 0);          // disable
-    ptr::write_volatile(SYST_RVR, 960_000 - 1); // reload
+    ptr::write_volatile(SYST_RVR, 96_000 - 1); // reload
     ptr::write_volatile(SYST_CVR, 0);          // clear current
     ptr::write_volatile(SYST_CSR, 0x7);        // enable + tickint + clksource=processor
 
@@ -586,6 +679,121 @@ static mut USB_DEVICE: Option<UsbDevice<'static, UsbBus<UsbFs>>> = None;
 static mut USB_BUS_G: Option<usb_device::bus::UsbBusAllocator<UsbBus<UsbFs>>> = None;
 static mut BP_ADDRS: [u32; FPB_MAX_COMP] = [0; FPB_MAX_COMP];
 static mut WATCH_ADDRS: [u32; DWT_MAX_COMP] = [0; DWT_MAX_COMP];
+
+/// True when an app has been launched and the monitor CLI runs from the USB ISR.
+static mut APP_RUNNING: bool = false;
+/// When set to true by a CLI command, the next SysTick (or ISR return) will
+/// halt the app and reboot back to the monitor shell.
+static mut STOP_REQUESTED: bool = false;
+/// Shell state for the ISR-based CLI (used when APP_RUNNING).
+static mut ISR_SHELL: ShellState = ShellState::new();
+
+// ════════════════════════════════════════════════════════════════
+// Always-on USB polling — handled in SysTick (no device IRQ needed)
+// ════════════════════════════════════════════════════════════════
+
+// When APP_RUNNING, SysTick (1000 Hz) polls USB and processes the
+// shell.  This avoids needing a device.x / PAC for OTG_FS IRQ vector.
+
+/// Called from systick_handler when APP_RUNNING to poll USB + shell.
+fn usb_poll_shell() {
+    unsafe {
+        let serial = match USB_SERIAL.as_mut() { Some(s) => s, None => return };
+        let usb_dev = match USB_DEVICE.as_mut() { Some(d) => d, None => return };
+
+        if !usb_dev.poll(&mut [serial]) {
+            return;
+        }
+
+        let mut buf = [0u8; 64];
+        let count = match serial.read(&mut buf) {
+            Ok(n) if n > 0 => n,
+            _ => return,
+        };
+
+        for i in 0..count {
+            let ch = buf[i];
+            match ch {
+                b'\r' | b'\n' => {
+                    serial_write_str(serial, "\r\n", usb_dev);
+                    if ISR_SHELL.cmd_len > 0 {
+                        let mut cmd_copy = [0u8; 128];
+                        let len = ISR_SHELL.cmd_len;
+                        cmd_copy[..len].copy_from_slice(&ISR_SHELL.cmd_buf[..len]);
+                        ISR_SHELL.reset();
+                        isr_dispatch(&cmd_copy[..len], serial, usb_dev);
+                    }
+                    serial_write_str(serial, "> ", usb_dev);
+                }
+                0x7F | 0x08 => {
+                    if ISR_SHELL.cmd_len > 0 {
+                        ISR_SHELL.cmd_len -= 1;
+                        serial_write_str(serial, "\x08 \x08", usb_dev);
+                    }
+                }
+                0x03 => {
+                    STOP_REQUESTED = true;
+                    serial_write_str(serial, "^C \u{2014} stopping app...\r\n", usb_dev);
+                }
+                _ => {
+                    if ISR_SHELL.cmd_len < 128 {
+                        ISR_SHELL.cmd_buf[ISR_SHELL.cmd_len] = ch;
+                        ISR_SHELL.cmd_len += 1;
+                        serial_write_all(serial, &[ch], usb_dev);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Subset of commands available while app is running (SysTick context).
+fn isr_dispatch(cmd: &[u8], serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
+                usb_dev: &mut UsbDevice<'_, UsbBus<UsbFs>>) {
+    let mut end = cmd.len();
+    for (i, &c) in cmd.iter().enumerate() {
+        if c == b' ' { end = i; break; }
+    }
+    let word = &cmd[..end];
+
+    match word {
+        b"stop" | b"kill" => {
+            unsafe { STOP_REQUESTED = true; }
+            serial_write_str(serial, "Stop requested.\r\n", usb_dev);
+        }
+        b"status" => {
+            serial_write_str(serial, "App running. Ctrl+C or 'stop' to halt.\r\n", usb_dev);
+        }
+        b"peek" => {
+            let args_raw = if end < cmd.len() { &cmd[end+1..] } else { &[] };
+            if let Some(addr) = parse_hex(args_raw.split(|&c| c == b' ').next().unwrap_or(&[])) {
+                let val = unsafe { ptr::read_volatile(addr as *const u32) };
+                serial_write_str(serial, "0x", usb_dev);
+                serial_write_hex32(serial, val, usb_dev);
+                serial_write_str(serial, "\r\n", usb_dev);
+            } else {
+                serial_write_str(serial, "Usage: peek <addr>\r\n", usb_dev);
+            }
+        }
+        b"upload" => {
+            unsafe { STOP_REQUESTED = true; }
+            serial_write_str(serial, "Stopping app for upload...\r\n", usb_dev);
+        }
+        b"help" | b"?" => {
+            serial_write_str(serial, concat!(
+                "Monitor (app running):\r\n",
+                "  stop/kill   Stop app, return to monitor\r\n",
+                "  status      Show app state\r\n",
+                "  peek <addr> Read memory\r\n",
+                "  upload      Stop app + start upload\r\n",
+                "  Ctrl+C      Stop app\r\n",
+            ), usb_dev);
+        }
+        _ => {
+            serial_write_str(serial, "App running. 'stop' first. 'help' for cmds.\r\n", usb_dev);
+        }
+    }
+}
 
 // Naked DebugMonitor handler: saves context, calls Rust handler, restores and returns
 core::arch::global_asm!(
@@ -1042,7 +1250,7 @@ fn serial_write_hex32(serial: &mut SerialPort<'_, UsbBus<UsbFs>>, val: u32,
 fn cmd_help(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
             usb_dev: &mut UsbDevice<'_, UsbBus<UsbFs>>) {
     serial_write_str(serial, concat!(
-        "LEGO Hub Monitor v0.2\r\n",
+        "LEGO Hub Monitor v0.4 (always-on)\r\n",
         "Commands:\r\n",
         "  help              Show this help\r\n",
         "  peek <addr>       Read 32-bit word\r\n",
@@ -1055,14 +1263,21 @@ fn cmd_help(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
         "  bp list           List active breakpoints\r\n",
         "  watch <addr>      Set data watchpoint (DWT, max 4)\r\n",
         "  watch clear [id]  Clear watchpoint(s)\r\n",
-        "  watch list        List active watchpoints\r\n",
+        "  watch list         List active watchpoints\r\n",
         "  motors            Dump motor GPIO/TIM1 config\r\n",
         "  dbgmon            Enable DebugMonitor exception\r\n",
         "  upload            Flash app binary (serial)\r\n",
-        "  run               Arm monitor + jump to app\r\n",
-        "                    (center button = pause)\r\n",
+        "  run               Launch app (monitor stays alive)\r\n",
+        "  off / poweroff    Power off hub (release PA13)\r\n",
         "  dfu               Enter STM32 system DFU\r\n",
         "  reboot            Reset MCU\r\n",
+        "While app runs:\r\n",
+        "  stop/kill/Ctrl+C  Stop app, return to monitor\r\n",
+        "  status            Show app state\r\n",
+        "  peek <addr>       Read memory\r\n",
+        "Hardware buttons (always active):\r\n",
+        "  Center short      Stop app / toggle demo\r\n",
+        "  Center long (3s)  Power off hub\r\n",
         "In breakpoint (dbg>):\r\n",
         "  cont / c          Continue execution\r\n",
         "  stop              Stop app, reboot to monitor\r\n",
@@ -1277,6 +1492,38 @@ fn cmd_dbgmon(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
     }
 }
 
+/// RAM-resident flash erase — runs from RAM so CPU doesn't stall during
+/// flash erase.  On single-bank STM32F4, flash reads are impossible while
+/// erase is in progress; if the erase-wait loop runs from flash, the CPU
+/// hangs and USB goes unpolled for ~1 second, killing the CDC connection.
+///
+/// This function is copied to a RAM buffer and called via function pointer.
+/// It does: wait BSY clear → start sector erase → wait BSY clear → clear CR.
+#[inline(never)]
+#[link_section = ".data"]
+unsafe fn flash_erase_sector4_from_ram() {
+    let flash_sr = (FLASH_R + 0x0C) as *const u32;
+    let flash_cr = (FLASH_R + 0x10) as *mut u32;
+
+    // Disable interrupts — any ISR in flash would stall during erase
+    core::arch::asm!("cpsid i");
+
+    // Wait for any prior operation
+    while ptr::read_volatile(flash_sr) & (1 << 16) != 0 {}
+
+    // SER=1, SNB=4, PSIZE=word(2), STRT=1
+    ptr::write_volatile(flash_cr, (1 << 1) | (4 << 3) | (2 << 8) | (1 << 16));
+
+    // Wait for erase to complete
+    while ptr::read_volatile(flash_sr) & (1 << 16) != 0 {}
+
+    // Clear CR
+    ptr::write_volatile(flash_cr, 0);
+
+    // Re-enable interrupts
+    core::arch::asm!("cpsie i");
+}
+
 fn cmd_upload(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
               usb_dev: &mut UsbDevice<'_, UsbBus<UsbFs>>) {
     // Unlock flash
@@ -1286,13 +1533,10 @@ fn cmd_upload(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
     }
 
     // Erase sector 4 (64KB at 0x08010000)
+    // Uses RAM-resident function to keep USB alive during erase.
     serial_write_str(serial, "Erasing sector 4...", usb_dev);
     unsafe {
-        while reg_read(FLASH_R, 0x0C) & (1 << 16) != 0 {}
-        // SER=1, SNB=4, PSIZE=word, STRT=1
-        reg_write(FLASH_R, 0x10, (1 << 1) | (4 << 3) | (2 << 8) | (1 << 16));
-        while reg_read(FLASH_R, 0x0C) & (1 << 16) != 0 {}
-        reg_write(FLASH_R, 0x10, 0);
+        flash_erase_sector4_from_ram();
     }
     serial_write_str(serial, " OK\r\nSend: ADDR VALUE (hex), 'end' to finish.\r\n", usb_dev);
 
@@ -1394,6 +1638,18 @@ fn dispatch_command(
 
     match cmd {
         b"help" | b"?" => cmd_help(serial, usb_dev),
+
+        b"demo" => { 
+            unsafe { DEMO_ACTIVE = true; LS_TICK = 0; JERK_CYCLE = 0; }
+            serial_write_str(serial, "Demo activated.\r\n", usb_dev);
+        },
+        b"stop" => {
+            unsafe { DEMO_ACTIVE = false; }
+            motor_set(Motor::A, 0);
+            motor_set(Motor::B, 0);
+            serial_write_str(serial, "Motors stopped.\r\n", usb_dev);
+        },
+
         b"peek" => cmd_peek(serial, usb_dev, args, 4),
         b"peek16" => cmd_peek(serial, usb_dev, args, 2),
         b"peek8" => cmd_peek(serial, usb_dev, args, 1),
@@ -1410,15 +1666,13 @@ fn dispatch_command(
             let sp_valid = app_sp >= 0x2000_0000 && app_sp <= 0x2005_0000;
             let pc_valid = app_pc >= APP_ADDR && app_pc <= 0x0810_0000;
             if sp_valid && pc_valid {
-                // Arm DebugMonitor before launching app
                 unsafe {
                     debug_monitor_enable();
-                    // Write our handler address to trampoline location
-                    // The app's DebugMonitor stub reads this and jumps to us
                     extern "C" { fn DebugMonitor(); }
                     ptr::write_volatile(TRAMPOLINE_ADDR, DebugMonitor as *const () as u32);
                 }
-                serial_write_str(serial, "Monitor armed. Center button = pause.\r\n", usb_dev);
+                serial_write_str(serial, "Monitor always-on. CLI stays active.\r\n", usb_dev);
+                serial_write_str(serial, "  stop/Ctrl+C = halt app | center btn = stop\r\n", usb_dev);
                 serial_write_str(serial, "Jumping to app...\r\n", usb_dev);
                 for _ in 0..50_000 {
                     usb_dev.poll(&mut [serial]);
@@ -1453,6 +1707,13 @@ fn dispatch_command(
             }
             cortex_m::peripheral::SCB::sys_reset();
         }
+        b"off" | b"poweroff" => {
+            serial_write_str(serial, "Powering off...\r\n", usb_dev);
+            for _ in 0..50_000 {
+                usb_dev.poll(&mut [serial]);
+            }
+            unsafe { power_off(); }
+        }
         _ => {
             serial_write_str(serial, "Unknown: ", usb_dev);
             serial_write_all(serial, cmd, usb_dev);
@@ -1465,6 +1726,82 @@ fn dispatch_command(
 // ════════════════════════════════════════════════════════════════
 // Entry point
 // ════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════
+// Motor control API (ported from hub-motors)
+// ════════════════════════════════════════════════════════════════
+const TIM1: u32 = 0x4001_0000;
+
+static mut DEMO_ACTIVE: bool = false;
+
+unsafe fn init_power_and_gpio() {
+    reg_modify(RCC, 0x30, 0, (1 << 0) | (1 << 4)); // GPIOA, GPIOE
+    // Motor AF
+    let af_clear = (0xF << 4) | (0xF << 12) | (0xF << 20) | (0xF << 24);
+    let af_set = (1 << 4) | (1 << 12) | (1 << 20) | (1 << 24);
+    reg_modify(0x4002_1000, 0x24, af_clear, af_set); // GPIOE AFRH
+    let speed_mask = (3 << 18) | (3 << 22) | (3 << 26) | (3 << 28);
+    reg_modify(0x4002_1000, 0x08, speed_mask, speed_mask); // GPIOE OSPEEDR
+    let moder_mask = (3u32 << 18) | (3 << 22) | (3 << 26) | (3 << 28);
+    let moder_out = (1u32 << 18) | (1 << 22) | (1 << 26) | (1 << 28);
+    reg_modify(0x4002_1000, 0x00, moder_mask, moder_out); // GPIOE MODER
+    reg_write(0x4002_1000, 0x18, (1 << 25) | (1 << 27) | (1 << 29) | (1 << 30));
+}
+
+unsafe fn init_timer() {
+    reg_modify(RCC, 0x44, 0, 1 << 0); // TIM1 clock
+    reg_write(TIM1, 0x28, 7); // TIM_PSC
+    reg_write(TIM1, 0x2C, 999); // TIM_ARR
+    reg_write(TIM1, 0x18, 0x6868); // CCMR1
+    reg_write(TIM1, 0x1C, 0x6868); // CCMR2
+    reg_write(TIM1, 0x20, 0x3333); // CCER
+    reg_write(TIM1, 0x34, 0); // CCR1
+    reg_write(TIM1, 0x38, 0);
+    reg_write(TIM1, 0x3C, 0);
+    reg_write(TIM1, 0x40, 0);
+    reg_write(TIM1, 0x44, 1 << 15); // BDTR
+    reg_write(TIM1, 0x00, (1 << 7) | (1 << 0)); // CR1
+    reg_write(TIM1, 0x14, 1); // EGR
+}
+
+#[derive(Clone, Copy)]
+pub enum Motor { A, B }
+
+impl Motor {
+    const fn hw(self) -> (u32, u32, u32, u32, u32, u32) {
+        match self {
+            Motor::A => (9, 11, 18, 22, 0x34, 0x38),
+            Motor::B => (13, 14, 26, 28, 0x3C, 0x40),
+        }
+    }
+}
+
+pub fn motor_set(motor: Motor, duty: i16) {
+    let duty = if duty > 1000 { 1000 } else if duty < -1000 { -1000 } else { duty };
+    let (pin1, pin2, sh1, sh2, ccr1, ccr2) = motor.hw();
+    let gpioe = 0x4002_1000;
+    unsafe {
+        if duty > 0 {
+            reg_write(TIM1, ccr1, duty as u32);
+            reg_modify(gpioe, 0x00, (3 << sh1) | (3 << sh2), (2 << sh1) | (1 << sh2));
+            reg_write(gpioe, 0x18, 1 << pin2);
+        } else if duty < 0 {
+            reg_write(TIM1, ccr2, (-duty) as u32);
+            reg_modify(gpioe, 0x00, (3 << sh1) | (3 << sh2), (1 << sh1) | (2 << sh2));
+            reg_write(gpioe, 0x18, 1 << pin1);
+        } else {
+            reg_write(TIM1, ccr1, 0);
+            reg_write(TIM1, ccr2, 0);
+            reg_modify(gpioe, 0x00, (3 << sh1) | (3 << sh2), (1 << sh1) | (1 << sh2));
+            reg_write(gpioe, 0x18, (1 << pin1) | (1 << pin2));
+        }
+    }
+}
+
+fn next_rng(state: &mut u32) -> u32 {
+    *state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+    *state
+}
 
 static mut EP_MEMORY: [u32; 512] = [0; 512];
 
@@ -1487,6 +1824,8 @@ fn main() -> ! {
 
         // ── 4. Init USB pins ────────────────────────────────
         init_usb_pins();
+        unsafe { init_power_and_gpio(); init_timer(); arm_systick(); }
+        let mut rng: u32 = 42;
 
         // ── 4. Set up USB CDC serial (global statics) ───────
         let usb_periph = UsbFs { _private: () };
@@ -1517,14 +1856,31 @@ fn main() -> ! {
         // ── 6. Interactive monitor shell ────────────────────
         let mut shell = ShellState::new();
 
-        serial_write_str(serial, "\r\n╔══════════════════════════════════╗\r\n", usb_dev);
-        serial_write_str(serial, "║  LEGO Hub Debug Monitor v0.2    ║\r\n", usb_dev);
-        serial_write_str(serial, "║  STM32F413 @ 96 MHz            ║\r\n", usb_dev);
-        serial_write_str(serial, "║  Type 'help' for commands      ║\r\n", usb_dev);
-        serial_write_str(serial, "╚══════════════════════════════════╝\r\n", usb_dev);
+        serial_write_str(serial, "\r\n\u{2554}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2557}\r\n", usb_dev);
+        serial_write_str(serial, "\u{2551}  LEGO Hub Debug Monitor v0.4    \u{2551}\r\n", usb_dev);
+        serial_write_str(serial, "\u{2551}  Always-on CLI (1kHz SysTick)   \u{2551}\r\n", usb_dev);
+        serial_write_str(serial, "\u{2551}  MPU-protected | STM32F413      \u{2551}\r\n", usb_dev);
+        serial_write_str(serial, "\u{2551}  Type 'help' for commands       \u{2551}\r\n", usb_dev);
+        serial_write_str(serial, "\u{255A}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{255D}\r\n", usb_dev);
         serial_write_str(serial, "> ", usb_dev);
 
         loop {
+
+        // Check background demo task
+        unsafe {
+            if DEMO_ACTIVE {
+                LS_TICK = LS_TICK.wrapping_add(1);
+                if LS_TICK > 40000 {
+                    LS_TICK = 0;
+                    let r1 = next_rng(&mut rng);
+                    let r2 = next_rng(&mut rng);
+                    let s_a = (r1 % 2000) as i16 - 1000;
+                    let s_b = (r2 % 2000) as i16 - 1000;
+                    motor_set(Motor::A, s_a);
+                    motor_set(Motor::B, s_b);
+                }
+            }
+        }
             if !usb_dev.poll(&mut [serial]) {
                 continue;
             }
