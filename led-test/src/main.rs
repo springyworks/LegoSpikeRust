@@ -352,6 +352,7 @@ unsafe fn set_motor_b(duty: i16) {
     }
 }
 
+#[allow(dead_code)]
 unsafe fn motor_set_both(duty: i16) {
     set_motor_a(duty);
     set_motor_b(duty);
@@ -591,9 +592,9 @@ fn main() -> ! {
         // Motor random rotation state
         let mut motor_countdown: u32 = 0; // frames until next move
         let mut motor_on_left: u32 = 0; // frames motor A still on
-        let mut motor_on_left_duty: i16 = 0;
+        let mut _motor_on_left_duty: i16 = 0;
         let mut motor_on_right: u32 = 0; // frames motor B still on
-        let mut motor_on_right_duty: i16 = 0;
+        let mut _motor_on_right_duty: i16 = 0;
 
         rng_seed();
 
@@ -679,9 +680,9 @@ fn main() -> ! {
                     let dir_b = if r2 & 0x100 != 0 { MOTOR_DUTY } else { -MOTOR_DUTY };
 
                     motor_on_left = on_a;
-                    motor_on_left_duty = dir_a;
+                    _motor_on_left_duty = dir_a;
                     motor_on_right = on_b;
-                    motor_on_right_duty = dir_b;
+                    _motor_on_right_duty = dir_b;
 
                     set_motor_a(dir_a);
                     set_motor_b(dir_b);

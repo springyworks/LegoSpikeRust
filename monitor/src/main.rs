@@ -60,6 +60,7 @@ const SPI1: u32 = 0x4001_3000;
 const TIM12: u32 = 0x4000_1800;
 
 // Center button: PC4, ADC1 channel 14
+#[allow(dead_code)]
 const BUTTON_THRESHOLD: u32 = 2879;
 
 // Debug registers
@@ -311,6 +312,7 @@ unsafe fn init_usb_pins() {
 // Center button (same as bootloader)
 // ════════════════════════════════════════════════════════════════
 
+#[allow(dead_code)]
 unsafe fn read_center_button() -> bool {
     // Enable GPIOC + ADC1 clocks
     reg_modify(RCC, 0x30, 0, 1 << 2);
@@ -527,6 +529,7 @@ unsafe fn jump_to_app(sp: u32, pc: u32) -> ! {
     // Mark app as running — SysTick shell takes over
     APP_RUNNING = true;
     STOP_REQUESTED = false;
+    PAUSED = false;
     ISR_SHELL.reset();
 
     core::arch::asm!("MSR MSP, {}", in(reg) sp);
@@ -660,6 +663,7 @@ extern "C" fn systick_handler() {
             motor_set(Motor::B, 0);
             APP_RUNNING = false;
             STOP_REQUESTED = false;
+            PAUSED = false;
             cortex_m::peripheral::SCB::sys_reset();
         }
 
@@ -705,8 +709,8 @@ extern "C" fn systick_handler() {
             if BUTTON_DEBOUNCE >= 10 && !BUTTON_WAS_PRESSED {
                 BUTTON_WAS_PRESSED = true;
                 if APP_RUNNING {
-                    // Short press while app running → stop app
-                    STOP_REQUESTED = true;
+                    // Short press while app running → toggle motor freeze
+                    PAUSED = !PAUSED;
                 } else {
                     DEMO_ACTIVE = !DEMO_ACTIVE;
                     if !DEMO_ACTIVE {
@@ -759,6 +763,8 @@ static mut APP_RUNNING: bool = false;
 /// When set to true by a CLI command, the next SysTick (or ISR return) will
 /// halt the app and reboot back to the monitor shell.
 static mut STOP_REQUESTED: bool = false;
+/// Motor freeze — short press while app runs toggles this. Motors output 0 when true.
+static mut PAUSED: bool = false;
 /// Shell state for the ISR-based CLI (used when APP_RUNNING).
 static mut ISR_SHELL: ShellState = ShellState::new();
 
@@ -835,8 +841,20 @@ fn isr_dispatch(cmd: &[u8], serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
             unsafe { STOP_REQUESTED = true; }
             serial_write_str(serial, "Stop requested.\r\n", usb_dev);
         }
+        b"pause" => {
+            unsafe { PAUSED = true; }
+            serial_write_str(serial, "Motors frozen.\r\n", usb_dev);
+        }
+        b"resume" | b"play" => {
+            unsafe { PAUSED = false; }
+            serial_write_str(serial, "Motors resumed.\r\n", usb_dev);
+        }
         b"status" => {
-            serial_write_str(serial, "App running. Ctrl+C or 'stop' to halt.\r\n", usb_dev);
+            if unsafe { PAUSED } {
+                serial_write_str(serial, "App running (PAUSED). 'resume' or short-press.\r\n", usb_dev);
+            } else {
+                serial_write_str(serial, "App running. Ctrl+C or 'stop' to halt.\r\n", usb_dev);
+            }
         }
         b"peek" => {
             let args_raw = if end < cmd.len() { &cmd[end+1..] } else { &[] };
@@ -856,11 +874,14 @@ fn isr_dispatch(cmd: &[u8], serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
         b"help" | b"?" => {
             serial_write_str(serial, concat!(
                 "Monitor (app running):\r\n",
-                "  stop/kill   Stop app, return to monitor\r\n",
-                "  status      Show app state\r\n",
-                "  peek <addr> Read memory\r\n",
-                "  upload      Stop app + start upload\r\n",
-                "  Ctrl+C      Stop app\r\n",
+                "  stop/kill    Stop app, return to monitor\r\n",
+                "  pause        Freeze motors (app keeps running)\r\n",
+                "  resume/play  Unfreeze motors\r\n",
+                "  status       Show app state\r\n",
+                "  peek <addr>  Read memory\r\n",
+                "  upload       Stop app + start upload\r\n",
+                "  Ctrl+C       Stop app\r\n",
+                "  Short-press  Toggle pause/resume\r\n",
             ), usb_dev);
         }
         _ => {
@@ -1349,10 +1370,12 @@ fn cmd_help(serial: &mut SerialPort<'_, UsbBus<UsbFs>>,
         "  reboot            Reset MCU\r\n",
         "While app runs:\r\n",
         "  stop/kill/Ctrl+C  Stop app, return to monitor\r\n",
+        "  pause             Freeze motors (app keeps running)\r\n",
+        "  resume/play       Unfreeze motors\r\n",
         "  status            Show app state\r\n",
         "  peek <addr>       Read memory\r\n",
         "Hardware buttons (always active):\r\n",
-        "  Center short      Stop app / toggle demo\r\n",
+        "  Center short      Pause/resume motors (app) / toggle demo\r\n",
         "  Center long (3s)  Power off hub\r\n",
         "In breakpoint (dbg>):\r\n",
         "  cont / c          Continue execution\r\n",
@@ -1791,7 +1814,7 @@ fn dispatch_command(
             unsafe { power_off(); }
         }
         b"protect" => {
-            if unsafe { flash_wrp_is_protected() } {
+            if flash_wrp_is_protected() {
                 serial_write_str(serial, "Flash already protected (sectors 0-3)\r\n", usb_dev);
             } else {
                 serial_write_str(serial, "Enabling flash write-protect sectors 0-3...\r\n", usb_dev);
@@ -1873,7 +1896,8 @@ impl Motor {
 }
 
 pub fn motor_set(motor: Motor, duty: i16) {
-    let duty = if duty > 1000 { 1000 } else if duty < -1000 { -1000 } else { duty };
+    // Motor freeze: when PAUSED, force all outputs to zero
+    let duty = if unsafe { PAUSED } { 0 } else if duty > 1000 { 1000 } else if duty < -1000 { -1000 } else { duty };
     let (pin1, pin2, sh1, sh2, ccr1, ccr2) = motor.hw();
     let gpioe = 0x4002_1000;
     unsafe {
@@ -1920,7 +1944,7 @@ fn main() -> ! {
 
         // ── 4. Init USB pins ────────────────────────────────
         init_usb_pins();
-        unsafe { init_power_and_gpio(); init_timer(); arm_systick(); }
+        init_power_and_gpio(); init_timer(); arm_systick();
         let mut rng: u32 = 42;
 
         // ── 4. Set up USB CDC serial (global statics) ───────
@@ -1956,7 +1980,7 @@ fn main() -> ! {
         serial_write_str(serial, "\u{2551}  LEGO Hub Debug Monitor v0.5    \u{2551}\r\n", usb_dev);
         serial_write_str(serial, "\u{2551}  Always-on CLI (1kHz SysTick)   \u{2551}\r\n", usb_dev);
         serial_write_str(serial, "\u{2551}  MPU-protected | STM32F413      \u{2551}\r\n", usb_dev);
-        if unsafe { flash_wrp_is_protected() } {
+        if flash_wrp_is_protected() {
             serial_write_str(serial, "\u{2551}  Flash WRP: ON (sectors 0-3)    \u{2551}\r\n", usb_dev);
         } else {
             serial_write_str(serial, "\u{2551}  Flash WRP: OFF                 \u{2551}\r\n", usb_dev);
@@ -1968,7 +1992,7 @@ fn main() -> ! {
         loop {
 
         // Check background demo task
-        unsafe {
+        {
             if DEMO_ACTIVE {
                 LS_TICK = LS_TICK.wrapping_add(1);
                 if LS_TICK > 40000 {
