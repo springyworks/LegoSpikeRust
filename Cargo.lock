@@ -251,6 +251,9 @@ dependencies = [
  "rtic",
  "rtic-monotonics",
  "stm32f4",
+ "synopsys-usb-otg",
+ "usb-device",
+ "usbd-serial",
 ]
 
 [[package]]
@@ -280,6 +283,14 @@ dependencies = [
  "synopsys-usb-otg",
  "usb-device",
  "usbd-serial",
+]
+
+[[package]]
+name = "motor-test"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
 ]
 
 [[package]]

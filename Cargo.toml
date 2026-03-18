@@ -6,10 +6,14 @@ members = [
   "bootloader",
   "monitor",
   "led-test",
-  # spike-rt crates (need spike-rt submodule cloned):
-  # "spike-rt/sample/rust_led/rust_app",
-  # "spike-rt/sample/rust_qemu_exercises/rust_app",
-  # "spike-rt/sample/rust_qemu_min/rust_app",
+  "motor-test",
+]
+
+exclude = [
+  # spike-rt has its own build system (compiles pbio C library)
+  "spike-rt",
+  # spike-rt-sim compiles pbio for native Linux simulation
+  "spike-rt-sim",
 ]
 
 [profile.dev]

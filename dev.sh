@@ -51,6 +51,9 @@ NORMAL_PIDS="0009 0010"
 # STM32 system bootloader DFU (entered via magic RAM jump)
 ST_VID="0483"
 ST_DFU_PID="df11"
+# Rust debug monitor USB CDC (1209:0001)
+MONITOR_VID="1209"
+MONITOR_PID="0001"
 BLE_NAME_PATTERNS="pbricks|pybricks|prime.hub|spike|lego|mindstorms"
 
 # Flash addresses
@@ -393,7 +396,7 @@ hw_diag() {
 }
 
 # Fast USB-only detection (sub-millisecond, no BLE scan)
-# Returns: dfu | usb_normal | charging | none
+# Returns: dfu | monitor | usb_normal | charging | none
 detect_hub_usb() {
   local usb_pids
   usb_pids="$(scan_usb_lego_pids)"
@@ -409,6 +412,16 @@ detect_hub_usb() {
     [[ "$(cat "$dev" 2>/dev/null)" == "$ST_VID" ]] || continue
     [[ "$(cat "${dev%idVendor}idProduct" 2>/dev/null)" == "$ST_DFU_PID" ]] && {
       echo "dfu"
+      return
+    }
+  done
+
+  # Rust debug monitor on USB? (1209:0001 → /dev/ttyACM*)
+  for dev in /sys/bus/usb/devices/*/idVendor; do
+    [[ -f "$dev" ]] || continue
+    [[ "$(cat "$dev" 2>/dev/null)" == "$MONITOR_VID" ]] || continue
+    [[ "$(cat "${dev%idVendor}idProduct" 2>/dev/null)" == "$MONITOR_PID" ]] && {
+      echo "monitor"
       return
     }
   done
@@ -469,6 +482,98 @@ get_dfu_device_id() {
   done
 }
 
+# ─── Hub serial CLI ("navel string") ─────────────────────────
+#
+# Send a command to the monitor via /dev/ttyACM*  USB CDC serial.
+# Uses python3 + pyserial for reliable DTR/RTS control.
+# Returns 0 on success, 1 on failure.
+
+hub_serial_cmd() {
+  local cmd="$1"
+  local tty=""
+
+  # Find the monitor's ttyACM device
+  for dev in /dev/ttyACM*; do
+    [[ -c "$dev" ]] || continue
+    tty="$dev"
+    break
+  done
+
+  if [[ -z "$tty" ]]; then
+    warn "No /dev/ttyACM* found for monitor"
+    return 1
+  fi
+
+  # Kill any stale processes on the port
+  fuser -k "$tty" 2>/dev/null || true
+  sleep 0.3
+
+  info "Sending '${cmd}' to monitor on ${tty}..."
+
+  # Use python3 + pyserial with proper flow control and timeouts
+  timeout 8 python3 -c "
+import serial, time, sys
+try:
+    s = serial.Serial('${tty}', 115200, timeout=1, write_timeout=2,
+                      dsrdtr=True, rtscts=False)
+    s.dtr = True
+    s.rts = True
+    time.sleep(0.3)
+    s.reset_input_buffer()
+    s.reset_output_buffer()
+    # Drain any queued output (banner, prompt)
+    s.read(4096)
+    # Send the command
+    s.write(b'${cmd}\r\n')
+    s.flush()
+    time.sleep(0.5)
+    # Read response
+    resp = s.read(1024)
+    s.close()
+    print(resp.decode(errors='replace').strip())
+    sys.exit(0)
+except Exception as e:
+    print(str(e), file=sys.stderr)
+    sys.exit(1)
+" 2>&1
+
+  local rc=$?
+  if [[ $rc -eq 0 ]]; then
+    ok "Command '${cmd}' sent"
+  else
+    warn "Serial command '${cmd}' may have failed (rc=${rc})"
+  fi
+  return $rc
+}
+
+# Send 'dfu' to monitor → hub enters STM32 system DFU
+# Falls back to other methods if serial fails.
+enter_dfu_from_monitor() {
+  info "Monitor detected — requesting DFU mode via serial..."
+  if hub_serial_cmd "dfu"; then
+    # Wait for monitor to disappear and DFU to appear
+    local wait=0
+    while (( wait < 15 )); do
+      sleep 1
+      wait=$((wait + 1))
+      local st
+      st="$(detect_hub_usb)"
+      if [[ "$st" == "dfu" ]]; then
+        ok "Hub switched to DFU mode automatically!"
+        return 0
+      fi
+      if [[ "$st" == "none" ]]; then
+        # Hub rebooting — keep waiting
+        printf "  ${DIM}[%s] rebooting... %ds${RST}\n" "$(ts)" "$wait"
+      fi
+    done
+    warn "DFU mode not detected after serial command."
+  fi
+  # Fallback: try USB reset to kick it
+  warn "Serial DFU failed — hub may need manual DFU entry."
+  return 1
+}
+
 # ─── Step 3: GET HUB INTO DFU ───────────────────────────────
 
 #  Elaborate decision tree — detects the hub's current state and
@@ -477,6 +582,7 @@ get_dfu_device_id() {
 #
 #  Detectable states (from detect_hub):
 #    dfu          → ready to flash
+#    monitor      → Rust debug monitor running (1209:0001)
 #    usb_normal   → hub powered on, running firmware over USB
 #    ble          → hub powered on, visible on Bluetooth only
 #    charging     → LEGO VID on USB but unknown PID
@@ -493,6 +599,15 @@ get_dfu_device_id() {
 wait_for_dfu() {
   local state
   state="$(detect_hub_usb)"
+
+  # Monitor detected → automatically send 'dfu' via serial
+  if [[ "$state" == "monitor" ]]; then
+    if enter_dfu_from_monitor; then
+      return 0
+    fi
+    # Fall through to manual DFU flow
+    state="$(detect_hub_usb)"
+  fi
 
   if [[ "$state" == "dfu" ]]; then
     ok "Hub in DFU mode"
@@ -568,6 +683,23 @@ wait_for_dfu() {
       last_state_change_time=$now_ts
 
       case "$state" in
+
+        # ── Monitor running (1209:0001) → auto-DFU via serial ──
+        monitor)
+          echo
+          ok "Debug monitor detected on USB"
+          play_sound "$ALERT_SOUND" &
+          if enter_dfu_from_monitor; then
+            state="dfu"
+            break
+          fi
+          # If serial DFU failed, treat as usb_normal and guide user
+          phase="need_shutdown"
+          echo
+          printf "  ${BLD}Serial DFU failed — manual step needed:${RST}\n"
+          action "Hold the ${BLD}center button${RST}${CYN} for 3 seconds to turn the hub off"
+          echo
+          ;;
 
         # ── Hub running on USB ─────────────────────────────
         usb_normal)
@@ -1207,7 +1339,16 @@ watch_loop() {
       # Wait for hub to re-enter DFU (dev-mode firmware does this automatically)
       info "Waiting for hub to re-enter DFU..."
       local dfu_wait=0
-      while [[ "$(detect_hub_usb)" != "dfu" ]]; do
+      while true; do
+        local hub_st
+        hub_st="$(detect_hub_usb)"
+        [[ "$hub_st" == "dfu" ]] && break
+        # Monitor detected → auto-send DFU via serial
+        if [[ "$hub_st" == "monitor" ]]; then
+          if enter_dfu_from_monitor; then
+            break
+          fi
+        fi
         sleep 1
         dfu_wait=$((dfu_wait + 1))
         if (( dfu_wait > DFU_WAIT_TIMEOUT )); then

@@ -1,0 +1,409 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.5 Chrome/138.0.7204.251 Electron/37.6.1 Safari/537.36" version="28.2.5">
+  <diagram id="hub-cheatsheet" name="SPIKE Hub Cheatsheet">
+    <mxGraphModel dx="864" dy="530" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1681" pageHeight="1189" math="0" shadow="0" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="&lt;b&gt;LEGO SPIKE Prime Hub — Rust Firmware Cheatsheet&lt;/b&gt;&lt;br&gt;4xwMWK — What / How / When / Why x Moeten / Willen / Kunnen" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+          <mxGeometry x="190" y="15" width="1300" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="matrix_label" value="&lt;b&gt;5x5 LED Matrix&lt;/b&gt;&lt;br&gt;TLC5955 on SPI1&lt;br&gt;PA5/PA7/PA15/PB15" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="720" y="145" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="matrix_bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#000000;" parent="1" vertex="1">
+          <mxGeometry x="740" y="200" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="m00" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="752" y="212" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m01" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="790" y="212" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m02" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="828" y="212" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m03" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="866" y="212" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m04" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="904" y="212" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m10" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="752" y="250" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m11" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="790" y="250" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m12" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="828" y="250" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m13" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="866" y="250" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m14" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="904" y="250" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m20" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="752" y="288" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m21" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="790" y="288" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m22" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="828" y="288" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m23" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="866" y="288" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m24" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="904" y="288" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m30" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="752" y="326" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m31" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="790" y="326" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m32" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="828" y="326" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m33" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="866" y="326" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m34" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="904" y="326" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m40" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="752" y="364" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m41" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="790" y="364" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m42" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="828" y="364" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m43" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="866" y="364" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="m44" value="" style="ellipse;fillColor=#cccccc;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="904" y="364" width="28" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ring_outer" value="" style="ellipse;fillColor=none;strokeColor=#000000;strokeWidth=2;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="770" y="430" width="140" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="center_btn" value="&lt;b&gt;CENTER&lt;/b&gt;&lt;br&gt;PC4 / ADC ch14&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;≤2879 = pressed&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;strokeWidth=1;aspect=fixed;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="800" y="460" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="left_btn" value="&lt;b&gt;LEFT&lt;/b&gt;&lt;br&gt;PA1/ADC ch1&lt;br&gt;Ladder CH_0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="608" y="470" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="right_btn" value="&lt;b&gt;RIGHT&lt;/b&gt;&lt;br&gt;PA1/ADC ch1&lt;br&gt;Ladder CH_1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="970" y="470" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="bt_btn" value="&lt;b&gt;BT&lt;/b&gt;&lt;br&gt;PA1/ADC ch1&lt;br&gt;Ladder CH_2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="970" y="415" width="100" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="port_a" value="&lt;b&gt;A&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="620" y="110" width="50" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="port_b" value="&lt;b&gt;B&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="690" y="110" width="50" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="port_c" value="&lt;b&gt;C&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="755" y="110" width="45" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="port_d" value="&lt;b&gt;D&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="815" y="110" width="45" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="port_e" value="&lt;b&gt;E&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="935" y="110" width="50" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="port_f" value="&lt;b&gt;F&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="1005" y="110" width="50" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="usbc" value="&lt;b&gt;USB-C&lt;/b&gt;&lt;br&gt;PA11(D-) PA12(D+)&lt;br&gt;OTG_FS AF10" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="790" y="620" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="speaker" value="&lt;b&gt;Speaker&lt;/b&gt;&lt;br&gt;PA4 toggle + PC10 amp&lt;br&gt;beep(ms, hz)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="790" y="560" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pwr" value="&lt;b&gt;PWR&lt;/b&gt;&lt;br&gt;PA13 HOLD&lt;br&gt;PA14 IO_VCC" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="915" y="560" width="80" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="motor_info" value="&lt;b&gt;Motors A/B (TIM1 PWM)&lt;/b&gt;&lt;br&gt;A: PE9(ch1) / PE11(ch2) — H-bridge&lt;br&gt;B: PE13(ch3) / PE14(ch4) — H-bridge&lt;br&gt;PSC=7, ARR=999 → 12kHz&lt;br&gt;Duty +/-500 (random dir)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="608" y="560" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="status_leds" value="&lt;b&gt;Status LEDs&lt;/b&gt; (TLC5955)&lt;br&gt;Ring top/bottom: ch43/44&lt;br&gt;Battery: ch11&lt;br&gt;Bluetooth: ch12" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="608" y="650" width="170" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="flash_title" value="&lt;b&gt;FLASH MEMORY MAP&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="20" y="90" width="250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="flash_lego" value="&lt;b&gt;0x08000000&lt;/b&gt;  LEGO DFU Bootloader&lt;br&gt;32KB / factory / DO NOT TOUCH&lt;br&gt;USB DFU ID: 0694:0011" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="125" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="flash_mon" value="&lt;b&gt;0x08008000&lt;/b&gt;  Debug Monitor&lt;br&gt;32KB / USB CDC shell / SysTick button poll&lt;br&gt;DebugMonitor handler / upload/run/stop" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="195" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="flash_app" value="&lt;b&gt;0x08010000&lt;/b&gt;  Application (led-test)&lt;br&gt;960KB / your Rust app / ~4KB used&lt;br&gt;RandomWheel: LED animations + motor random rotations" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="265" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ram_title" value="&lt;b&gt;RAM LAYOUT&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="20" y="350" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ram_app" value="&lt;b&gt;0x20000000&lt;/b&gt;  App RAM — 312KB — .bss/.data/stack" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="20" y="380" width="280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ram_mon" value="&lt;b&gt;0x2004E000&lt;/b&gt;  Monitor RAM (8KB)&lt;br&gt;USB/serial statics survive app exec&lt;br&gt;0x2004FFE0=DebugMon ptr / 0x2004FFE4=SysTick ptr&lt;br&gt;0x2004FFF0=DFU magic (0xDEADB007)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="20" y="420" width="280" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="table_title" value="&lt;b&gt;OPERATIONS TABLE — 4xwMWK&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="20" y="510" width="550" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="th_what" value="&lt;b&gt;WHAT&lt;/b&gt;&lt;br&gt;(Wat)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;fontColor=#000000;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="20" y="550" width="160" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="th_how" value="&lt;b&gt;HOW&lt;/b&gt;&lt;br&gt;(Hoe)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;fontColor=#000000;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="180" y="550" width="350" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="th_when" value="&lt;b&gt;WHEN&lt;/b&gt;&lt;br&gt;(Wanneer)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;fontColor=#000000;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="530" y="550" width="180" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="th_why" value="&lt;b&gt;WHY&lt;/b&gt;&lt;br&gt;(Waarom)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;fontColor=#000000;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="710" y="550" width="180" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="th_mwk" value="&lt;b&gt;M/W/K&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;fontColor=#000000;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="550" width="100" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="r1_what" value="&lt;b&gt;Power ON&lt;/b&gt;&lt;br&gt;(cold start)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="585" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r1_how" value="1. Plug USB-C cable&lt;br&gt;2. Press center button ~1s until ring lights green&lt;br&gt;3. Monitor boots → &lt;b&gt;green ring = dbg&amp;gt; ready&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="585" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r1_when" value="Hub completely dead&lt;br&gt;(no LEDs, no USB)&lt;br&gt;or after real power reset" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="585" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r1_why" value="PA13 must go HIGH&lt;br&gt;to latch power on.&lt;br&gt;Monitor does this in pre_init" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="585" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r1_mwk" value="&lt;b&gt;M&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="585" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r2_what" value="&lt;b&gt;Upload App&lt;/b&gt;&lt;br&gt;(flash new binary)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="640" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r2_how" value="&lt;b&gt;From dbg&amp;gt; prompt:&lt;/b&gt;&lt;br&gt;&lt;code&gt;python3 upload.py /tmp/led-test.bin /dev/ttyACM0&lt;/code&gt;&lt;br&gt;OR DFU: &lt;code&gt;dfu-util -d 0694:0011 -a 0 -s 0x08010000:leave -D bin&lt;/code&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="640" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r2_when" value="Hub at &lt;b&gt;dbg&amp;gt;&lt;/b&gt; prompt&lt;br&gt;(green ring, app stopped)&lt;br&gt;or in LEGO DFU mode" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="640" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r2_why" value="Writes to 0x08010000&lt;br&gt;sector 4. Erases first.&lt;br&gt;upload.py timeout=5s erase" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="640" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r2_mwk" value="&lt;b&gt;M&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="640" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r3_what" value="&lt;b&gt;Run App&lt;/b&gt;&lt;br&gt;(start RandomWheel)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="695" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r3_how" value="&lt;b&gt;Serial:&lt;/b&gt; type &lt;code&gt;run&lt;/code&gt; at dbg&amp;gt; prompt&lt;br&gt;&lt;b&gt;No-USB:&lt;/b&gt; power on → monitor auto-runs last uploaded app&lt;br&gt;(if app in flash at 0x08010000 with valid vector table)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="695" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r3_when" value="After upload or on&lt;br&gt;fresh power-on.&lt;br&gt;Hub at dbg&amp;gt; prompt." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="695" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r3_why" value="Jumps to 0x08010000&lt;br&gt;App takes over SysTick&lt;br&gt;via trampoline at FFE4" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="695" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r3_mwk" value="&lt;b&gt;M&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="695" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r4_what" value="&lt;b&gt;Pause / Stop&lt;/b&gt;&lt;br&gt;(return to dbg&amp;gt;)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="750" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r4_how" value="&lt;b&gt;Hold CENTER button ~2s&lt;/b&gt; → monitor SysTick&lt;br&gt;fires DebugMonitor → &lt;b&gt;dbg&amp;gt;&lt;/b&gt; prompt returns&lt;br&gt;Then type &lt;code&gt;stop&lt;/code&gt; to fully halt app" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="750" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r4_when" value="App is running&lt;br&gt;(blue ring, motors&lt;br&gt;moving, matrix active)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="750" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r4_why" value="SysTick stays in monitor&lt;br&gt;RAM. Polls ADC for btn.&lt;br&gt;500ms hold → DebugMon" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="750" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r4_mwk" value="&lt;b&gt;M&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="750" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r5_what" value="&lt;b&gt;Power OFF&lt;/b&gt;&lt;br&gt;(shutdown)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="805" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r5_how" value="&lt;b&gt;Long-press CENTER ~3s&lt;/b&gt; (while app running)&lt;br&gt;→ app calls shutdown_hub() → PA13 LOW → power dies&lt;br&gt;Or: &lt;b&gt;unplug USB + remove battery&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="805" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r5_when" value="Done playing.&lt;br&gt;Want to conserve battery.&lt;br&gt;Taking hub on the road." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="805" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r5_why" value="PA13 LOW drops power&lt;br&gt;latch. No drain.&lt;br&gt;Flash preserves app." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="805" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r5_mwk" value="&lt;b&gt;W&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="805" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r6_what" value="&lt;b&gt;Toggle RandomWheel&lt;/b&gt;&lt;br&gt;(LED show + motors)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="860" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r6_how" value="&lt;b&gt;Press LEFT + RIGHT simultaneously&lt;/b&gt; (~160ms window)&lt;br&gt;→ toggles resident mode on/off&lt;br&gt;Beep confirms button press (10ms @ 4kHz)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="860" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r6_when" value="App running (blue ring).&lt;br&gt;Idle mode = matrix shows&lt;br&gt;steady pattern, motors off." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="860" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r6_why" value="Both motors do random&lt;br&gt;rotations &lt;= 90 deg. xorshift32&lt;br&gt;PRNG. 0.8-2s intervals." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="860" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r6_mwk" value="&lt;b&gt;W&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="860" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r7_what" value="&lt;b&gt;DFU Recovery&lt;/b&gt;&lt;br&gt;(flash when stuck)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="915" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r7_how" value="&lt;b&gt;Hold CENTER + plug USB&lt;/b&gt; → LEGO DFU (0694:0011)&lt;br&gt;&lt;code&gt;dfu-util -d 0694:0011 -a 0 -s 0x08010000:leave -D file.bin&lt;/code&gt;&lt;br&gt;Verify: &lt;code&gt;lsusb | grep 0694&lt;/code&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="915" width="350" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r7_when" value="Hub unresponsive to&lt;br&gt;serial and center button.&lt;br&gt;Frozen/bricked app." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="915" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r7_why" value="LEGO factory BL always&lt;br&gt;intact at 0x08000000.&lt;br&gt;Last-resort recovery." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="915" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r7_mwk" value="&lt;b&gt;K&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="915" width="100" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="r8_what" value="&lt;b&gt;Build App&lt;/b&gt;&lt;br&gt;(compile Rust)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="20" y="970" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r8_how" value="&lt;b&gt;!! MUST build from crate dir, NOT workspace root !!&lt;/b&gt;&lt;br&gt;&lt;code&gt;cd led-test &amp;amp;&amp;amp; cargo build --release&lt;/code&gt;&lt;br&gt;&lt;code&gt;arm-none-eabi-objcopy -O binary \&lt;br&gt;  target/thumbv7em-none-eabihf/release/led-test /tmp/led-test.bin&lt;/code&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=9;align=left;spacingLeft=5;" parent="1" vertex="1">
+          <mxGeometry x="180" y="970" width="350" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r8_when" value="After code changes.&lt;br&gt;Per-crate .cargo/config&lt;br&gt;has target + link flags." style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="530" y="970" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r8_why" value="Workspace root build&lt;br&gt;ignores crate config →&lt;br&gt;&lt;b&gt;EMPTY BINARY!&lt;/b&gt;&lt;br&gt;thumbv7em-none-eabihf" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="710" y="970" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r8_mwk" value="&lt;b&gt;K&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="890" y="970" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="boot_title" value="&lt;b&gt;BOOT CHAIN (3-stage)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="90" width="250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="boot1" value="&lt;b&gt;LEGO BL&lt;/b&gt;&lt;br&gt;0x08000000" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="125" width="120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="boot_arr1" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#000000;" parent="1" source="boot1" target="boot2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="boot2" value="&lt;b&gt;Monitor&lt;/b&gt;&lt;br&gt;0x08008000" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="1280" y="125" width="120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="boot_arr2" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#000000;" parent="1" source="boot2" target="boot3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="boot3" value="&lt;b&gt;App&lt;/b&gt;&lt;br&gt;0x08010000" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="1440" y="125" width="120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="sm_title" value="&lt;b&gt;HUB STATE MACHINE&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="190" width="250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s_dead" value="&lt;b&gt;DEAD&lt;/b&gt;&lt;br&gt;no power" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="225" width="90" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s_dbg" value="&lt;b&gt;dbg&amp;gt;&lt;/b&gt;&lt;br&gt;green ring&lt;br&gt;monitor shell" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1270" y="225" width="110" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="s_idle" value="&lt;b&gt;APP IDLE&lt;/b&gt;&lt;br&gt;blue ring&lt;br&gt;matrix pattern" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1440" y="225" width="110" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="s_run" value="&lt;b&gt;RESIDENT&lt;/b&gt;&lt;br&gt;motors spin&lt;br&gt;LED animation" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1370" y="355" width="110" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="press center" style="endArrow=block;endFill=1;strokeWidth=1;fontSize=8;html=1;strokeColor=#000000;" parent="1" source="s_dead" target="s_dbg" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="run" style="endArrow=block;endFill=1;strokeWidth=1;fontSize=8;html=1;strokeColor=#000000;" parent="1" source="s_dbg" target="s_idle" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="L+R combo" style="endArrow=block;endFill=1;strokeWidth=1;fontSize=8;html=1;strokeColor=#000000;entryX=1;entryY=0.5;" parent="1" source="s_idle" target="s_run" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" value="L+R combo" style="endArrow=block;endFill=1;strokeWidth=1;fontSize=8;html=1;strokeColor=#000000;exitX=1;exitY=0.5;" parent="1" source="s_run" target="s_idle" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t5" value="hold center 2s" style="endArrow=block;endFill=1;strokeWidth=1;fontSize=8;html=1;strokeColor=#000000;curved=1;" parent="1" source="s_idle" target="s_dbg" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t6" value="long center 3s" style="endArrow=block;endFill=1;strokeWidth=1;fontSize=8;html=1;strokeColor=#000000;curved=1;" parent="1" source="s_idle" target="s_dead" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="340" />
+              <mxPoint x="1160" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cmd_title" value="&lt;b&gt;QUICK COMMANDS&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="420" width="250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd_box" value="&lt;div style=&quot;text-align:left;font-family:monospace;font-size:11px;line-height:1.8&quot;&gt;&lt;b&gt;Monitor Shell (dbg&amp;gt;):&lt;/b&gt;&lt;br&gt;&amp;nbsp; run &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;— jump to app at 0x08010000&lt;br&gt;&amp;nbsp; stop &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;— halt app, return to dbg&amp;gt;&lt;br&gt;&amp;nbsp; cont &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;— continue paused app&lt;br&gt;&amp;nbsp; regs &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;— dump CPU registers&lt;br&gt;&amp;nbsp; upload &amp;nbsp;&amp;nbsp;&amp;nbsp;— enter upload mode&lt;br&gt;&amp;nbsp; help &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;— show commands&lt;br&gt;&lt;br&gt;&lt;b&gt;Host Commands:&lt;/b&gt;&lt;br&gt;&amp;nbsp; python3 upload.py /tmp/led-test.bin /dev/ttyACM0&lt;br&gt;&amp;nbsp; picocom -b 115200 /dev/ttyACM0&lt;br&gt;&amp;nbsp; cd led-test &amp;amp;&amp;amp; cargo build --release&lt;br&gt;&amp;nbsp; arm-none-eabi-objcopy -O binary \&lt;br&gt;&amp;nbsp; &amp;nbsp; target/thumbv7em-none-eabihf/release/led-test /tmp/led-test.bin&lt;br&gt;&amp;nbsp; lsusb | grep 0694&lt;br&gt;&amp;nbsp; dfu-util -d 0694:0011 -a 0 -s 0x08010000:leave -D file.bin&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=10;spacingTop=5;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="450" width="530" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="led_title" value="&lt;b&gt;LED RING INDICATOR&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="770" width="250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="led_green" value="" style="ellipse;fillColor=#00cc66;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="805" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="led_green_t" value="&lt;b&gt;Green ring&lt;/b&gt; = Monitor active (dbg&amp;gt; prompt ready)" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="800" width="400" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="led_blue" value="" style="ellipse;fillColor=#4488ff;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="835" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="led_blue_t" value="&lt;b&gt;Blue ring&lt;/b&gt; = App running, IDLE mode (no motors)" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="830" width="400" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="led_purple" value="" style="ellipse;fillColor=#cc66ff;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="865" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="led_purple_t" value="&lt;b&gt;Purple/cycling&lt;/b&gt; = RESIDENT mode (motors + LED show)" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="860" width="400" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="led_off" value="" style="ellipse;fillColor=#333333;strokeColor=#000000;aspect=fixed;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="895" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="led_off_t" value="&lt;b&gt;No light&lt;/b&gt; = Hub is OFF (dead / shutdown)" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="890" width="400" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="trouble_title" value="&lt;b&gt;TROUBLESHOOTING&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="930" width="250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="trouble_box" value="&lt;div style=&quot;text-align:left;font-size:10px;line-height:1.6&quot;&gt;&lt;b&gt;Serial unresponsive?&lt;/b&gt; → Hold center 2s for dbg&amp;gt;, or DFU recovery&lt;br&gt;&lt;b&gt;Empty binary (0 bytes)?&lt;/b&gt; → Build from crate dir, not workspace root!&lt;br&gt;&lt;b&gt;Port locked?&lt;/b&gt; → &lt;code&gt;fuser /dev/ttyACM0&lt;/code&gt; then &lt;code&gt;kill PID&lt;/code&gt;&lt;br&gt;&lt;b&gt;ADC hangs?&lt;/b&gt; → Monitor SysTick clears ADON. App must re-assert.&lt;br&gt;&lt;b&gt;Upload erase timeout?&lt;/b&gt; → Increase sleep in upload.py (5s)&lt;br&gt;&lt;b&gt;No /dev/ttyACM0?&lt;/b&gt; → Hub off or in DFU mode. Check &lt;code&gt;lsusb&lt;/code&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=10;spacingTop=5;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="960" width="530" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="standalone_title" value="&lt;b&gt;STANDALONE OPERATION (No USB)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="20" y="1060" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="standalone_box" value="&lt;div style=&quot;text-align:left;font-size:11px;line-height:1.7&quot;&gt;&lt;b&gt;After full power-off (battery temp-removed, no USB):&lt;/b&gt;&lt;br&gt;1. Insert charged battery or plug USB-C&lt;br&gt;2. Press CENTER button ~1s → hub powers on → monitor starts → green ring&lt;br&gt;3. If app was previously uploaded → type &lt;code&gt;run&lt;/code&gt; (serial) OR monitor may auto-start app&lt;br&gt;4. Without serial: use button combos only (L+R=toggle, long center=shutdown)&lt;br&gt;&lt;br&gt;&lt;b&gt;App persists in flash&lt;/b&gt; — survives power loss. No re-upload needed.&lt;br&gt;&lt;b&gt;Only battery + CENTER press needed to start&lt;/b&gt; — no PC required for operation.&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;fontSize=10;align=left;spacingLeft=10;spacingTop=5;" parent="1" vertex="1">
+          <mxGeometry y="1090" width="600" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" value="LegoSpikeRust Cheatsheet / 4xwMWK / A3 Landscape / Print at 100%" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=9;fontColor=#000000;" parent="1" vertex="1">
+          <mxGeometry x="500" y="1160" width="680" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

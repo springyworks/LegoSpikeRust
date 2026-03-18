@@ -5,6 +5,10 @@
 //!   - Battery LED
 //!   - Bluetooth LED
 //!   - 5×5 Light Matrix
+//!   - Ring-button behavior test (SPIKE-like):
+//!       * long center press -> power down (standby)
+//!       * left+right near-simultaneous press -> toggle resident program
+//!         (LED show + small motor ticks)
 //!
 //! Launched via monitor's 'run' command (0x08010000).
 //! Properly initializes TLC5955 control register before sending
@@ -67,7 +71,10 @@ const FLASH_R: u32 = 0x4002_3C00;
 const GPIOA: u32 = 0x4002_0000;
 const GPIOB: u32 = 0x4002_0400;
 const GPIOC: u32 = 0x4002_0800;
+const GPIOE: u32 = 0x4002_1000;
 const SPI1: u32 = 0x4001_3000;
+const ADC1: u32 = 0x4001_2000;
+const TIM1: u32 = 0x4001_0000;
 const TIM12: u32 = 0x4000_1800;
 
 // ════════════════════════════════════════════════════════════════
@@ -87,6 +94,24 @@ const MATRIX: [u8; 25] = [
     26, 27, 32, 34, 22,
     25, 40, 30, 35,  9,
 ];
+
+// Button thresholds and flags (from prime_hub resistor ladder)
+const BUTTON_CENTER_THRESHOLD: u32 = 2879;
+const LR_LEVELS: [u32; 8] = [3872, 3394, 3009, 2755, 2538, 2327, 2141, 1969];
+
+const BTN_CENTER: u8 = 0x01;
+const BTN_LEFT: u8 = 0x02;
+const BTN_RIGHT: u8 = 0x04;
+
+// Interaction timing (20 ms control loop)
+const LOOP_MS: u32 = 20;
+const CENTER_LONG_PRESS_TICKS: u32 = 100; // 2.0 s
+const SIDE_SYNC_WINDOW_TICKS: u32 = 8; // 160 ms tolerance
+const MOTOR_MIN_PERIOD: u32 = 40; // 800 ms min between moves
+const MOTOR_PERIOD_RANGE: u32 = 60; // +0..1200 ms random
+const MOTOR_MIN_ON: u32 = 3; // 60 ms min pulse
+const MOTOR_ON_RANGE: u32 = 5; // +0..100 ms random (max ~160 ms ≈ 90°)
+const MOTOR_DUTY: i16 = 500;
 
 // ════════════════════════════════════════════════════════════════
 // Register access helpers
@@ -110,6 +135,87 @@ unsafe fn reg_modify(base: u32, offset: u32, clear: u32, set: u32) {
 
 fn delay_ms(ms: u32) {
     cortex_m::asm::delay(ms * 96_000); // 96 MHz
+}
+
+// ════════════════════════════════════════════════════════════════
+// Buttons (ADC resistor ladder)
+// ════════════════════════════════════════════════════════════════
+
+unsafe fn init_button_adc() {
+    // GPIOA + GPIOC + ADC1 clocks
+    reg_modify(RCC, 0x30, 0, (1 << 0) | (1 << 2));
+    reg_modify(RCC, 0x44, 0, 1 << 8);
+    let _ = reg_read(RCC, 0x44);
+
+    // PC4 analog (center), PA1 analog (left/right/bt ladder)
+    reg_modify(GPIOC, 0x00, 3 << 8, 3 << 8);
+    reg_modify(GPIOA, 0x00, 3 << 2, 3 << 2);
+
+    // ADC1 single conversion, long sample time for stable ladder reads
+    reg_write(ADC1, 0x2C, 0); // SQR1: 1 conversion
+    reg_modify(ADC1, 0x0C, 7 << 12, 7 << 12); // SMPR1 ch14
+    reg_modify(ADC1, 0x10, 7 << 3, 7 << 3); // SMPR2 ch1
+    reg_modify(ADC1, 0x08, 0, 1 << 0); // CR2 ADON
+}
+
+fn read_adc(channel: u32) -> u32 {
+    unsafe {
+        // Disable interrupts to prevent the monitor's SysTick handler from
+        // reconfiguring/disabling ADC1 mid-conversion (it turns off ADON
+        // after each button poll).
+        cortex_m::interrupt::disable();
+        reg_write(ADC1, 0x34, channel); // SQR3
+        reg_modify(ADC1, 0x08, 0, 1 << 0); // ensure ADON
+        reg_write(ADC1, 0x00, 0); // clear SR
+        reg_modify(ADC1, 0x08, 0, 1 << 30); // SWSTART
+        // Wait for EOC with timeout — never spin forever
+        let mut timeout = 100_000u32;
+        while reg_read(ADC1, 0x00) & (1 << 1) == 0 {
+            timeout -= 1;
+            if timeout == 0 {
+                // ADC stuck — re-init ADON and return max (no press)
+                reg_modify(ADC1, 0x08, 1 << 0, 0); // clear ADON
+                cortex_m::asm::delay(100);
+                reg_modify(ADC1, 0x08, 0, 1 << 0); // set ADON
+                cortex_m::interrupt::enable();
+                return 4095;
+            }
+        }
+        let val = reg_read(ADC1, 0x4C); // DR
+        cortex_m::interrupt::enable();
+        val
+    }
+}
+
+fn read_buttons() -> u8 {
+    let mut flags = 0u8;
+
+    // Center button on PC4 / ADC14
+    if read_adc(14) <= BUTTON_CENTER_THRESHOLD {
+        flags |= BTN_CENTER;
+    }
+
+    // Left/Right on PA1 / ADC1 (via resistor ladder bins)
+    let v = read_adc(1);
+    if v <= LR_LEVELS[0] {
+        if v > LR_LEVELS[1] {
+            // BT-only, ignore
+        } else if v > LR_LEVELS[2] {
+            flags |= BTN_RIGHT;
+        } else if v > LR_LEVELS[3] {
+            flags |= BTN_RIGHT; // right+bt
+        } else if v > LR_LEVELS[4] {
+            flags |= BTN_LEFT;
+        } else if v > LR_LEVELS[5] {
+            flags |= BTN_LEFT; // left+bt
+        } else if v > LR_LEVELS[6] {
+            flags |= BTN_LEFT | BTN_RIGHT;
+        } else if v > LR_LEVELS[7] {
+            flags |= BTN_LEFT | BTN_RIGHT; // all
+        }
+    }
+
+    flags
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -168,6 +274,126 @@ unsafe fn beep(duration_ms: u32, freq_hz: u32) {
     }
     reg_write(GPIOC, 0x18, 1 << (10 + 16)); // amp off
     reg_modify(GPIOA, 0x00, 3 << 8, 3 << 8); // PA4 analog
+}
+
+// ════════════════════════════════════════════════════════════════
+// Small motor tick support (ports A+B H-bridge via TIM1)
+// ════════════════════════════════════════════════════════════════
+
+unsafe fn init_motor_hw() {
+    // Enable GPIOA + GPIOE + TIM1 clocks
+    reg_modify(RCC, 0x30, 0, (1 << 0) | (1 << 4));
+    reg_modify(RCC, 0x44, 0, 1 << 0);
+    let _ = reg_read(RCC, 0x44);
+
+    // PA14 output HIGH: enable I/O port VCC
+    reg_modify(GPIOA, 0x00, 3 << 28, 1 << 28);
+    reg_write(GPIOA, 0x18, 1 << 14);
+
+    // PE9/11/13/14 AF1 (TIM1 CH1..CH4)
+    let af_clear = (0xF << 4) | (0xF << 12) | (0xF << 20) | (0xF << 24);
+    let af_set = (1 << 4) | (1 << 12) | (1 << 20) | (1 << 24);
+    reg_modify(GPIOE, 0x24, af_clear, af_set);
+
+    // High speed on these pins
+    let speed_mask = (3 << 18) | (3 << 22) | (3 << 26) | (3 << 28);
+    reg_modify(GPIOE, 0x08, speed_mask, speed_mask);
+
+    // Start as GPIO outputs (coast)
+    let moder_mask = (3u32 << 18) | (3 << 22) | (3 << 26) | (3 << 28);
+    let moder_out = (1u32 << 18) | (1 << 22) | (1 << 26) | (1 << 28);
+    reg_modify(GPIOE, 0x00, moder_mask, moder_out);
+    reg_write(GPIOE, 0x18, (1 << (9 + 16)) | (1 << (11 + 16)) | (1 << (13 + 16)) | (1 << (14 + 16)));
+
+    // TIM1 PWM: 12 kHz, ARR=999, PSC=7
+    reg_write(TIM1, 0x28, 7); // PSC
+    reg_write(TIM1, 0x2C, 999); // ARR
+    reg_write(TIM1, 0x18, 0x6868); // CCMR1 CH1/2 PWM1 + preload
+    reg_write(TIM1, 0x1C, 0x6868); // CCMR2 CH3/4 PWM1 + preload
+    reg_write(TIM1, 0x20, 0x3333); // CCER polarity inverted (matches hub wiring)
+    reg_write(TIM1, 0x34, 0); // CCR1
+    reg_write(TIM1, 0x38, 0); // CCR2
+    reg_write(TIM1, 0x3C, 0); // CCR3
+    reg_write(TIM1, 0x40, 0); // CCR4
+    reg_write(TIM1, 0x44, 1 << 15); // BDTR MOE
+    reg_write(TIM1, 0x00, (1 << 7) | (1 << 0)); // CR1 ARPE + CEN
+    reg_write(TIM1, 0x14, 1); // EGR UG
+}
+
+unsafe fn set_motor_a(duty: i16) {
+    let duty = duty.clamp(-1000, 1000);
+    if duty > 0 {
+        reg_write(TIM1, 0x34, duty as u32); // CCR1
+        reg_modify(GPIOE, 0x00, (3 << 18) | (3 << 22), (2 << 18) | (1 << 22));
+        reg_write(GPIOE, 0x18, 1 << 11);
+    } else if duty < 0 {
+        reg_write(TIM1, 0x38, (-duty) as u32); // CCR2
+        reg_modify(GPIOE, 0x00, (3 << 18) | (3 << 22), (1 << 18) | (2 << 22));
+        reg_write(GPIOE, 0x18, 1 << 9);
+    } else {
+        reg_modify(GPIOE, 0x00, (3 << 18) | (3 << 22), (1 << 18) | (1 << 22));
+        reg_write(GPIOE, 0x18, (1 << (9 + 16)) | (1 << (11 + 16)));
+    }
+}
+
+unsafe fn set_motor_b(duty: i16) {
+    let duty = duty.clamp(-1000, 1000);
+    if duty > 0 {
+        reg_write(TIM1, 0x3C, duty as u32); // CCR3
+        reg_modify(GPIOE, 0x00, (3 << 26) | (3 << 28), (2 << 26) | (1 << 28));
+        reg_write(GPIOE, 0x18, 1 << 14);
+    } else if duty < 0 {
+        reg_write(TIM1, 0x40, (-duty) as u32); // CCR4
+        reg_modify(GPIOE, 0x00, (3 << 26) | (3 << 28), (1 << 26) | (2 << 28));
+        reg_write(GPIOE, 0x18, 1 << 13);
+    } else {
+        reg_modify(GPIOE, 0x00, (3 << 26) | (3 << 28), (1 << 26) | (1 << 28));
+        reg_write(GPIOE, 0x18, (1 << (13 + 16)) | (1 << (14 + 16)));
+    }
+}
+
+unsafe fn motor_set_both(duty: i16) {
+    set_motor_a(duty);
+    set_motor_b(duty);
+}
+
+unsafe fn motor_coast_all() {
+    set_motor_a(0);
+    set_motor_b(0);
+}
+
+fn shutdown_hub() -> ! {
+    unsafe {
+        motor_coast_all();
+        // PA13 LOW => cut power hold (deep-sleep/standby by PMIC path)
+        reg_write(GPIOA, 0x18, 1 << (13 + 16));
+    }
+    loop { cortex_m::asm::wfi(); }
+}
+
+// Simple xorshift32 PRNG (no_std friendly)
+static mut RNG_STATE: u32 = 0xDEAD_BEEF;
+
+fn rng_next() -> u32 {
+    unsafe {
+        let mut s = RNG_STATE;
+        s ^= s << 13;
+        s ^= s >> 17;
+        s ^= s << 5;
+        RNG_STATE = s;
+        s
+    }
+}
+
+/// Seed the PRNG with something entropy-ish (SysTick counter + ADC noise)
+fn rng_seed() {
+    unsafe {
+        let systick_val = ptr::read_volatile(0xE000_E018 as *const u32);
+        let adc_noise = read_adc(14) ^ read_adc(1);
+        RNG_STATE = systick_val ^ adc_noise ^ 0xCAFE_BABE;
+        // Warm up
+        for _ in 0..8 { rng_next(); }
+    }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -284,12 +510,49 @@ unsafe fn tlc5955_send_gs(channels: &[u16; 48]) {
     tlc5955_latch();
 }
 
-/// Helper: set a single channel, send GS, wait
-unsafe fn show_single(ch: usize, brightness: u16, ms: u32) {
+unsafe fn show_idle_frame() {
     let mut gs = [0u16; 48];
-    gs[ch] = brightness;
+
+    // Dim center matrix pixel
+    gs[MATRIX[12] as usize] = 0x1000;
+
+    // Status top ring: soft blue while idle
+    gs[3] = 0x0800;
+
     tlc5955_send_gs(&gs);
-    delay_ms(ms);
+}
+
+unsafe fn show_resident_frame(frame: u32) {
+    let mut gs = [0u16; 48];
+
+    // Status ring breathing green
+    let p = (frame % 20) as i32;
+    let tri = if p < 10 { p } else { 19 - p } as u16;
+    let breath = 0x0800 + (tri * 0x0200);
+    gs[4] = breath;
+
+    // Moving dot on matrix + faint tail
+    let idx = (frame as usize) % 25;
+    gs[MATRIX[idx] as usize] = 0x3000;
+    gs[MATRIX[(idx + 24) % 25] as usize] = 0x1000;
+
+    // Keep BT LED dim cyan-ish as "resident running" marker
+    gs[19] = 0x0800;
+    gs[18] = 0x0800;
+
+    tlc5955_send_gs(&gs);
+}
+
+unsafe fn toggle_resident_program(running: &mut bool, frame: &mut u32) {
+    *running = !*running;
+    *frame = 0;
+    if *running {
+        show_resident_frame(0);
+        motor_coast_all();
+    } else {
+        motor_coast_all();
+        show_idle_frame();
+    }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -313,86 +576,137 @@ fn main() -> ! {
         tlc5955_send_control();
         tlc5955_send_control();
 
-        let bright: u16 = 0x2000; // moderate brightness
+        // Initialize button ADC and motor hardware for ring-button feature tests
+        init_button_adc();
+        init_motor_hw();
+
+        show_idle_frame();
+
+        let mut prev_btns = read_buttons();
+        let mut center_hold_ticks = 0u32;
+
+        let mut resident_running = false;
+        let mut resident_frame = 0u32;
+
+        // Motor random rotation state
+        let mut motor_countdown: u32 = 0; // frames until next move
+        let mut motor_on_left: u32 = 0; // frames motor A still on
+        let mut motor_on_left_duty: i16 = 0;
+        let mut motor_on_right: u32 = 0; // frames motor B still on
+        let mut motor_on_right_duty: i16 = 0;
+
+        rng_seed();
+
+        // Simultaneous-press tolerance state
+        let mut pending_side: u8 = 0;
+        let mut pending_ticks: u32 = 0;
+        let mut combo_latch = false;
 
         loop {
-            // ── 1. Status LED top: Red → Green → Blue → White ──
-            show_single(5, bright, 600);  // Red
-            show_single(4, bright, 600);  // Green
-            show_single(3, bright, 600);  // Blue
+            let btns = read_buttons();
+            let rising = btns & !prev_btns;
 
-            // White (all three)
-            let mut gs = [0u16; 48];
-            gs[3] = bright; gs[4] = bright; gs[5] = bright;
-            tlc5955_send_gs(&gs);
-            delay_ms(600);
-
-            // ── 2. Status LED bottom: Red → Green → Blue ───────
-            show_single(8, bright, 500);  // Red
-            show_single(7, bright, 500);  // Green
-            show_single(6, bright, 500);  // Blue
-
-            // ── 3. Both status LEDs: top=green, bottom=blue ────
-            gs = [0; 48];
-            gs[4] = bright; gs[6] = bright;
-            tlc5955_send_gs(&gs);
-            delay_ms(600);
-
-            // ── 4. Battery LED: Red → Green → Blue ─────────────
-            show_single(2, bright, 500);
-            show_single(1, bright, 500);
-            show_single(0, bright, 500);
-
-            // ── 5. Bluetooth LED: Red → Green → Blue ───────────
-            show_single(20, bright, 500);
-            show_single(19, bright, 500);
-            show_single(18, bright, 500);
-
-            // ── 6. Light matrix: all on ────────────────────────
-            gs = [0; 48];
-            for &ch in &MATRIX {
-                gs[ch as usize] = bright / 4;
+            // Short click on ANY button press — audible feedback for dev/user
+            if rising != 0 {
+                beep(10, 4000);
             }
-            tlc5955_send_gs(&gs);
-            delay_ms(800);
 
-            // ── 7. Light matrix: row by row ────────────────────
-            for row in 0..5 {
-                gs = [0; 48];
-                for col in 0..5 {
-                    gs[MATRIX[row * 5 + col] as usize] = bright;
+            // Long center-ring press => power down
+            if btns & BTN_CENTER != 0 {
+                center_hold_ticks += 1;
+                if center_hold_ticks >= CENTER_LONG_PRESS_TICKS {
+                    shutdown_hub();
                 }
-                tlc5955_send_gs(&gs);
-                delay_ms(300);
+            } else {
+                center_hold_ticks = 0;
             }
 
-            // ── 8. Light matrix: column by column ──────────────
-            for col in 0..5 {
-                gs = [0; 48];
-                for row in 0..5 {
-                    gs[MATRIX[row * 5 + col] as usize] = bright;
-                }
-                tlc5955_send_gs(&gs);
-                delay_ms(300);
-            }
+            // Left+Right near-simultaneous => toggle resident program
+            if !combo_latch {
+                let side_rising = rising & (BTN_LEFT | BTN_RIGHT);
 
-            // ── 9. Light matrix: diagonal sweep ────────────────
-            for diag in 0..9 {
-                gs = [0; 48];
-                for row in 0..5 {
-                    let col = diag as i32 - row as i32;
-                    if col >= 0 && col < 5 {
-                        gs[MATRIX[row * 5 + col as usize] as usize] = bright;
+                if side_rising == (BTN_LEFT | BTN_RIGHT) {
+                    toggle_resident_program(&mut resident_running, &mut resident_frame);
+                    combo_latch = true;
+                    pending_side = 0;
+                    pending_ticks = 0;
+                } else {
+                    if side_rising == BTN_LEFT || side_rising == BTN_RIGHT {
+                        pending_side = side_rising;
+                        pending_ticks = SIDE_SYNC_WINDOW_TICKS;
+                    }
+
+                    if pending_side != 0 {
+                        let other = if pending_side == BTN_LEFT { BTN_RIGHT } else { BTN_LEFT };
+                        let pending_still_down = (btns & pending_side) != 0;
+                        let other_now_down = (btns & other) != 0;
+
+                        if pending_still_down && other_now_down {
+                            toggle_resident_program(&mut resident_running, &mut resident_frame);
+                            combo_latch = true;
+                            pending_side = 0;
+                            pending_ticks = 0;
+                        } else {
+                            if pending_ticks > 0 {
+                                pending_ticks -= 1;
+                            }
+                            if pending_ticks == 0 || !pending_still_down {
+                                pending_side = 0;
+                            }
+                        }
                     }
                 }
-                tlc5955_send_gs(&gs);
-                delay_ms(200);
             }
 
-            // ── 10. All off briefly ────────────────────────────
-            gs = [0; 48];
-            tlc5955_send_gs(&gs);
-            delay_ms(800);
+            // Rearm combo detector once both side buttons are no longer held together
+            if btns & (BTN_LEFT | BTN_RIGHT) != (BTN_LEFT | BTN_RIGHT) {
+                combo_latch = false;
+            }
+
+            // Resident behavior: LED show + random motor rotations
+            if resident_running {
+                show_resident_frame(resident_frame);
+
+                // Independent random rotation for each motor
+                if motor_countdown == 0 {
+                    // Pick random duration and direction for each motor independently
+                    let r = rng_next();
+                    let on_a = MOTOR_MIN_ON + (r % (MOTOR_ON_RANGE + 1));
+                    let dir_a = if r & 0x100 != 0 { MOTOR_DUTY } else { -MOTOR_DUTY };
+
+                    let r2 = rng_next();
+                    let on_b = MOTOR_MIN_ON + (r2 % (MOTOR_ON_RANGE + 1));
+                    let dir_b = if r2 & 0x100 != 0 { MOTOR_DUTY } else { -MOTOR_DUTY };
+
+                    motor_on_left = on_a;
+                    motor_on_left_duty = dir_a;
+                    motor_on_right = on_b;
+                    motor_on_right_duty = dir_b;
+
+                    set_motor_a(dir_a);
+                    set_motor_b(dir_b);
+
+                    let r3 = rng_next();
+                    motor_countdown = MOTOR_MIN_PERIOD + (r3 % (MOTOR_PERIOD_RANGE + 1));
+                } else {
+                    motor_countdown -= 1;
+                }
+
+                // Stop each motor after its on-time expires
+                if motor_on_left > 0 {
+                    motor_on_left -= 1;
+                    if motor_on_left == 0 { set_motor_a(0); }
+                }
+                if motor_on_right > 0 {
+                    motor_on_right -= 1;
+                    if motor_on_right == 0 { set_motor_b(0); }
+                }
+
+                resident_frame = resident_frame.wrapping_add(1);
+            }
+
+            prev_btns = btns;
+            delay_ms(LOOP_MS);
         }
     }
 }

@@ -25,4 +25,17 @@ pybricks-micropython/
 # Backup / temp files
 *~
 *.bak
+*.bkp
 *.swp
+.$*
+
+# Private
+chat.txt
+
+# Experimental / not ready for release
+spike-rt/
+spike-rt-sim/
+
+# Temporary patch scripts
+patch*.py
+patch_*.rs

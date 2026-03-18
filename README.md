@@ -8,7 +8,7 @@ No OS. No HAL crate. No RTOS. Just Rust, direct register access, and a resident 
 
 ## What This Is
 
-A from-scratch Rust firmware stack for the LEGO Education SPIKE Prime Hub (STM32F413VGT6), built entirely without an operating system. The only "OS" here is a 25 KB Rust debug monitor that lives in flash and supervises application code.
+A from-scratch Rust firmware stack for the LEGO Education SPIKE Prime Hub (STM32F413VGT6), built entirely without an operating system. The only "OS" here is a 29 KB Rust debug monitor that lives in flash and supervises application code — with an always-on USB CLI that stays responsive even while apps run.
 
 ### Architecture
 
@@ -39,20 +39,23 @@ A from-scratch Rust firmware stack for the LEGO Education SPIKE Prime Hub (STM32
 
 ## Features
 
-### Debug Monitor (`monitor/` — 1,585 lines of Rust, 25 KB binary)
+### Debug Monitor (`monitor/` — 2,042 lines of Rust, 29 KB binary)
 
 A resident embedded debug monitor providing:
 
+- **Always-on USB CLI** — SysTick at 1 kHz polls USB in the ISR; shell stays responsive while apps run. Type `stop`, `status`, or `peek` at any time.
 - **USB CDC serial shell** — interactive command line over USB
 - **Memory inspection** — `peek`, `poke`, `dump` (hex dump with ASCII)
 - **Hardware breakpoints** — FPB (Flash Patch and Breakpoint unit), up to 6 breakpoints
 - **Data watchpoints** — DWT (Data Watchpoint and Trace unit), up to 4 watchpoints
 - **Single-step execution** — ARM DebugMonitor exception (MON_STEP)
 - **Register inspection** — `regs`, `set r0 value` while halted at breakpoint
-- **Center button pause** — press the hub's center button to pause a running app (via ADC resistor ladder reading + SysTick interrupt)
+- **ARM MPU protection** — monitor flash (32 KB) is read-only, monitor RAM (8 KB) is privileged-only. A rogue app cannot erase or corrupt the monitor.
+- **Flash write protection (WRP)** — STM32 option-byte write-protect on sectors 0–3 (bootloader + monitor). Hardware-enforced; even direct FLASH controller writes are blocked.  
+- **Center button** — short press = stop app / toggle demo; long press (3 s) = power off (PA13 release, like Pybricks)
 - **Serial app upload** — flash new application code without DFU mode (`upload` command + `upload.py`)
 - **Motor diagnostics** — `motors` command dumps GPIO/TIM1 config for all 6 ports
-- **DFU entry** — `dfu` command to enter the STM32 system bootloader. [How to do DFU](https://github.com/orgs/pybricks/discussions/688), it can happen that one has to temporarely remove the battery and the USB to reset the hub completley first before going into DFU;
+- **DFU entry** — `dfu` command to enter the STM32 system bootloader. [How to do DFU](https://github.com/orgs/pybricks/discussions/688), it can happen that one has to temporarily remove the battery and the USB to reset the hub completely first before going into DFU
 
 ### Application Trampolines
 
@@ -67,7 +70,8 @@ Apps are simple `#[no_std]` binaries with inline assembly trampolines that forwa
 
 | Crate         | Purpose                                   | Binary Size |
 | ------------- | ----------------------------------------- | ----------- |
-| `monitor/`    | Resident debug monitor + USB serial shell | 25 KB       |
+| `monitor/`    | Resident debug monitor + USB serial shell | 29 KB       |
+| `motor-test/` | Minimal motor demo app (random A+B)       | 2.3 KB      |
 | `led-test/`   | LED matrix test app (TLC5955 driver)      | 3.3 KB      |
 | `hub-motors/` | Motor control with RTIC v2 + defmt        | —           |
 | `bootloader/` | Simple bootloader (superseded by monitor) | —           |
@@ -144,16 +148,26 @@ python3 upload.py led-test.bin /dev/ttyACM0
 ```
 > help              — show all commands
 > upload            — flash app binary over serial
-> run               — arm monitor + jump to app (center button = pause)
+> run               — launch app (monitor stays alive)
 > motors            — dump motor GPIO/TIM1 config
-> peek <addr>       — read 32-bit word
+> peek <addr>       — read 32-bit word (works while app runs)
+> peek16/peek8      — read 16/8-bit
 > poke <addr> <val> — write 32-bit word
-> dump <addr> <len> — hex dump
+> dump <addr> <len> — hex dump (max 256 bytes)
 > bp <addr>         — set hardware breakpoint
 > watch <addr>      — set data watchpoint
 > dbgmon            — enable DebugMonitor exception
+> protect           — enable flash WRP (sectors 0-3)
+> unprotect         — disable flash WRP (for DFU updates)
+> off / poweroff    — power off hub (release PA13)
 > dfu               — enter STM32 system DFU
 > reboot            — reset MCU
+
+While app runs (always-on):
+> stop / kill       — stop app, return to monitor
+> status            — show app state
+> peek <addr>       — read memory live
+> Ctrl+C            — emergency stop
 
 At breakpoint (dbg> prompt):
 > cont              — continue execution
@@ -170,10 +184,13 @@ At breakpoint (dbg> prompt):
 There is no RTOS, no scheduler, no threads. The monitor is a single `#[no_main]` binary that:
 
 1. Configures the PLL (96 MHz HCLK, 48 MHz USB)
-2. Initializes USB OTG FS as CDC serial
-3. Runs a polling loop reading serial commands
-4. Uses ARM DebugMonitor exception (not halt-mode debug) for breakpoints and single-step
-5. Uses SysTick interrupt at 100 Hz to poll the center button via ADC
+2. Sets up ARM MPU (monitor flash = read-only, monitor RAM = privileged-only)
+3. Optionally enables STM32 flash write protection (option bytes WRP, sectors 0–3)
+4. Initializes USB OTG FS as CDC serial
+5. Runs a polling loop reading serial commands
+6. Uses SysTick at **1 kHz** to poll USB in the ISR — the shell stays alive even while apps run in thread mode
+7. Uses ARM DebugMonitor exception (not halt-mode debug) for breakpoints and single-step
+8. Long-press center button (3 s) triggers power off (PA13 release, motors stop)
 
 ### Center Button — The Resistor Ladder Trap
 
@@ -187,11 +204,14 @@ The TLC5955 LED driver requires the control register to be sent **twice** before
 
 - [x] Custom Rust bootloader with DFU support
 - [x] Resident debug monitor with USB serial shell
+- [x] **Always-on CLI** — shell stays responsive while apps run (SysTick 1 kHz USB polling)
 - [x] Memory inspection (peek/poke/dump)
 - [x] Hardware breakpoints (FPB) and data watchpoints (DWT)
 - [x] Single-step debugging via DebugMonitor exception
-- [x] Center button pause (ADC resistor ladder)
+- [x] Center button stop (ADC resistor ladder) + long-press power off
 - [x] Serial app upload (no DFU for app dev)
+- [x] ARM MPU protection (monitor flash RO, monitor RAM priv-only)
+- [x] STM32 flash write protection (option bytes WRP, sectors 0–3)
 - [x] TLC5955 LED matrix driver (5×5 + status LEDs)
 - [x] Motor PWM control (TIM1/TIM4 H-bridge)
 - [ ] Motor encoder reading
